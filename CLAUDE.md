@@ -50,15 +50,19 @@ The user is NOT a DGX/HPC expert. This is one of the first times using this infr
 
 ### Suggested Step Sequence
 
-1. **Dockerfile**: Build and test locally with `docker run --gpus all`. Verify `import scanpy`, `import rapids_singlecell`, GPU visibility (`nvidia-smi` inside container).
-2. **Data download script**: Download the 1.3M brain dataset, run subsampling. Verify file sizes and cell counts.
-3. **CPU benchmark script**: Run Scanpy pipeline on 10k cells locally. Verify timing, memory, and output JSON format.
-4. **GPU benchmark script**: Run rapids-singlecell pipeline on 10k cells locally (RTX 4090). Verify timing, memory, and output JSON.
-5. **Concordance script**: Compare CPU vs GPU results from steps 3–4. Verify ARI, NMI, HVG overlap.
-6. **Push to Docker Hub, pull on DGX as Singularity**: First contact with the DGX. Run a minimal smoke test (10k cells, 1 GPU).
-7. **SLURM jobs for full-scale CPU benchmark**: Run on DGX with all dataset sizes.
-8. **SLURM jobs for GPU scaling**: 1/2/4/8 GPU on large datasets.
-9. **Analysis and figures**: Generate publication-ready plots.
+1. **Dockerfile**: Build and test locally with `docker run --gpus all`. ✅ DONE
+2. **Data download script**: Download the 1.3M brain dataset, run subsampling. ✅ DONE
+3. **CPU benchmark script**: Run Scanpy pipeline on 10k cells locally. ✅ DONE
+4. **GPU benchmark script**: Run rapids-singlecell pipeline on 10k cells locally (RTX 4090). ✅ DONE
+5. **Concordance script**: Compare CPU vs GPU results from steps 3–4. ✅ DONE
+6. **Push to Docker Hub, pull on DGX as Singularity**: Smoke test (10k cells, 1 GPU). ✅ DONE
+7. **SLURM jobs for full-scale CPU benchmark**: All dataset sizes × 5 repeats. ✅ DONE
+8. **SLURM jobs for GPU scaling**: 1/2/4/8 GPU on all datasets × 5 repeats. ✅ DONE
+9. **Analysis and figures**: 6 publication-ready figures + summary table. ✅ DONE (locally)
+10. **Max-power stress test**: Download full ~3.6M mouse brain, find DGX cell limit via binary search. 🔄 IN PROGRESS
+11. **Manuscript (scRNA-seq part)**: Write the single-cell sections of the full-length paper. ⏳ TODO
+12. **Spatial omics benchmark**: Extend to Visium/Visium HD/Xenium — see `SPATIAL.md`. ⏳ TODO (after step 11)
+13. **Manuscript (spatial part + finalize)**: Add spatial sections, condense to 4–5 pages for CIBB 2026. ⏳ TODO
 
 ### Local Machine Setup
 - **Docker**: Must be installed with NVIDIA Container Toolkit (`nvidia-docker`) for GPU passthrough.
@@ -104,7 +108,7 @@ Our group's primary node is **poddgx02**. SLURM does NOT support soft node prefe
 - `#SBATCH --nodelist=poddgx02,poddgx01` — accept either node, no preference order guaranteed
 - No `--nodelist` — SLURM picks the best available node across the cluster (5 DGX nodes total)
 
-For this project we left `--nodelist` unset and let SLURM schedule freely. For future studies where node affinity matters, use `--nodelist=poddgx02` to pin jobs to our node.
+**For this project all jobs MUST use `--nodelist=poddgx02`** to pin to our node. Only remove if the user explicitly asks.
 
 ### SLURM Essentials
 
@@ -128,9 +132,42 @@ scancel <JOBID>
 
 Every job script MUST include:
 ```bash
-#SBATCH --partition dgx12cluster
-#SBATCH --account dctv_dgx
+#SBATCH --partition=dgx12cluster
+#SBATCH --account=dctv_dgx
+#SBATCH --export=NONE
+#SBATCH --chdir=/home/u0044
+#SBATCH --output=/home/u0044/slurm-%x_%j.out
+#SBATCH --error=/home/u0044/slurm-%x_%j.err
+#SBATCH --nodelist=poddgx02
 ```
+
+And MUST follow this boilerplate (see `slurm/gpu_8.sh` as reference):
+```bash
+# Load required modules
+module load go/1.22.7
+module load singularity/4.2.0
+module load slurm/slurm/23.02.7
+
+# Detect workdir (path differs between login and compute nodes)
+if [ -d /mnt/home/u0044/sc-gpu-benchmark ]; then
+    WORKDIR=/mnt/home/u0044/sc-gpu-benchmark
+elif [ -d /home/u0044/sc-gpu-benchmark ]; then
+    WORKDIR=/home/u0044/sc-gpu-benchmark
+else
+    echo "FAILED: sc-gpu-benchmark not found"; exit 1
+fi
+
+CONTAINER=${WORKDIR}/sc-benchmark.sif
+SINGULARITY=/cm/shared/apps/singularity/4.2.0/bin/singularity
+BIND_ARGS=(-B /home/u0044:/home/u0044)
+[ -d /mnt/home/u0044 ] && BIND_ARGS+=(-B /mnt/home/u0044:/mnt/home/u0044)
+
+run_in_container() {
+    "${SINGULARITY}" exec --nv "${BIND_ARGS[@]}" "${CONTAINER}" "$@"
+}
+```
+
+**NOTE**: `--mail-type ALL` does NOT work — the cluster has no mail service configured. Monitor jobs with `squeue -u u0044` and `sacct`.
 
 ### Container Workflow (CRITICAL)
 
@@ -431,21 +468,25 @@ sc-gpu-benchmark/
 ├── scripts/
 │   ├── download_data.py      # Download + subsample datasets
 │   ├── benchmark_cpu.py      # CPU-only Scanpy pipeline
-│   ├── benchmark_gpu.py      # Single-GPU RAPIDS pipeline  
+│   ├── benchmark_gpu.py      # Single-GPU RAPIDS pipeline
 │   ├── benchmark_multigpu.py # Multi-GPU RAPIDS + Dask pipeline
+│   ├── benchmark_maxpower.py # Max-power stress test (find DGX cell limit)
 │   ├── compare_results.py    # Concordance + stability analysis
 │   └── generate_figures.py   # Publication-ready plots
 ├── slurm/
-│   ├── download.sh           # SLURM job: data download
+│   ├── download.sh           # SLURM job: data download (1.3M)
+│   ├── download_full.sh      # SLURM job: download full ~3.6M mouse brain
 │   ├── cpu_benchmark.sh      # SLURM job: CPU benchmarks
 │   ├── gpu_1.sh              # SLURM job: 1 GPU
 │   ├── gpu_2.sh              # SLURM job: 2 GPUs
 │   ├── gpu_4.sh              # SLURM job: 4 GPUs
 │   ├── gpu_8.sh              # SLURM job: 8 GPUs
-│   └── analysis.sh           # SLURM job: compare results
+│   └── maxpower.sh           # SLURM job: max-power stress test (8 GPU, --find-limit)
+├── manuscript/
+│   └── bibliography/         # BibTeX references for the paper
 ├── data/                     # Downloaded datasets (in home dir — 500 GB available)
 ├── results/                  # Benchmark outputs (JSON/CSV)
-└── figures/                  # Generated plots
+└── figures/                  # Generated plots (PNG only) + LEGENDS.md + summary_table.csv
 ```
 
 ---
@@ -615,20 +656,69 @@ Use matplotlib with a clean, publication-ready style. Save as both PDF and PNG (
 
 Follow the **Suggested Step Sequence** in the "Development Rules" section above. Summary:
 
-**LOCAL PHASE** (steps 1–5):
+**LOCAL PHASE** (steps 1–5): ✅ ALL DONE
 1. Dockerfile → build + test locally with RTX 4090
 2. Data download + subsampling script → verify locally
 3. CPU benchmark script → run on 10k cells locally, check outputs
 4. GPU benchmark script → run on 10k cells locally (RTX 4090), check outputs
 5. Concordance script → compare CPU vs GPU, verify metrics
 
-**DGX PHASE** (steps 6–9):
-6. Push container to Docker Hub, pull on DGX, smoke test (10k cells, 1 GPU)
-7. Full-scale CPU benchmarks (all dataset sizes, 5 repeats)
-8. GPU scaling benchmarks (1/2/4/8 GPUs on 500k and 1.3M, 5 repeats)
-9. Analysis and figure generation
+**DGX PHASE** (steps 6–10):
+6. Push container to Docker Hub, pull on DGX, smoke test ✅ DONE
+7. Full-scale CPU benchmarks (all dataset sizes, 5 repeats) ✅ DONE
+8. GPU scaling benchmarks (1/2/4/8 GPUs, all sizes, 5 repeats) ✅ DONE
+9. Analysis and figure generation ✅ DONE (6 figures + summary table)
+10. Max-power stress test (full ~3.6M mouse brain + binary search for DGX limit) 🔄 IN PROGRESS
+11. Manuscript — scRNA-seq sections
+12. Spatial omics benchmark (Visium/HD/Xenium) — see `SPATIAL.md` — **after step 11**
+13. Manuscript — spatial sections + finalize → condense for CIBB 2026
 
-**Each step requires user approval before proceeding to the next.** Steps 7–8 can run in parallel on the DGX if cluster capacity allows.
+**Each step requires user approval before proceeding to the next.**
+
+---
+
+## Manuscript Writing Workflow
+
+### Target Venue
+- **CIBB 2026** — Special session: "GPU-Accelerated Analysis of Single-Cell and Spatial Omics"
+- **Deadline**: May 3, 2026
+- **Format**: 4–6 page short paper (extended abstract / proceedings style)
+- **Strategy**: Write a full-length paper first, then condense to 4–5 pages for CIBB submission
+
+### Toolchain: Markdown + BibTeX + Pandoc
+The manuscript is written in Pandoc Markdown with citation keys. Pandoc compiles to DOCX (for submission) or PDF (for review).
+
+```
+manuscript/
+├── manuscript.md          # Main text (Pandoc Markdown)
+├── bibliography/
+│   └── cibb2026_references.bib  # Master BibTeX — ALL citations
+├── build.sh               # pandoc build script (docx/pdf/both)
+└── csl/                   # Citation style files (if needed)
+```
+
+### How Citations Work
+1. **In manuscript.md**: use `[@citation_key]` syntax, e.g., `[@Wolf2018]`, `[@Dicks2026; @Traag2019]`
+2. **In bibliography/cibb2026_references.bib**: every cited key must have a BibTeX entry with correct DOI
+3. **Pandoc** resolves keys → numbered/author-year references, auto-generates bibliography
+4. **Key naming convention**: `Firstauthor_Year` (e.g., `Wolf2018`, `Dicks2026`, `Traag2019`)
+
+### Operational Rules for Claude
+- **NEVER invent DOIs or references**. If a citation is needed and not in the .bib file, flag it with `TODO_CITE` and describe what's needed.
+- **Adding new references**: add to `bibliography/cibb2026_references.bib` with full metadata (authors, title, journal, year, volume, pages, DOI). Verify DOI exists via the source documents or web search.
+- **Zotero integration**: the user can export from Zotero → BibTeX → paste into the .bib file. Keys may need renaming to match convention.
+
+### Building the Manuscript
+```bash
+# DOCX for submission (default)
+./manuscript/build.sh
+
+# PDF for review
+./manuscript/build.sh pdf
+
+# Both formats
+./manuscript/build.sh both
+```
 
 ---
 
