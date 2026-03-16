@@ -95,6 +95,16 @@ ls -la /mnt/home/u0044
 - **Account**: `dctv_dgx`
 - **Job scheduler**: SLURM with Singularity containers
 - **Module system**: lmod (minimal — Singularity, HPC SDK, OpenMPI)
+- **Our node**: `poddgx02` — this is the node assigned to our group. Jobs should preferentially run here.
+
+### Node Affinity (for future studies)
+
+Our group's primary node is **poddgx02**. SLURM does NOT support soft node preferences — `--nodelist` is a hard constraint. Options:
+- `#SBATCH --nodelist=poddgx02` — run ONLY on poddgx02; if busy, job waits in queue
+- `#SBATCH --nodelist=poddgx02,poddgx01` — accept either node, no preference order guaranteed
+- No `--nodelist` — SLURM picks the best available node across the cluster (5 DGX nodes total)
+
+For this project we left `--nodelist` unset and let SLURM schedule freely. For future studies where node affinity matters, use `--nodelist=poddgx02` to pin jobs to our node.
 
 ### SLURM Essentials
 

@@ -70,9 +70,9 @@ run_in_container nvidia-smi
 echo ""
 
 # Dataset sizes to benchmark (smallest → largest)
-# NOTE: Single H100 80GB VRAM limit is ~100k cells. 500k and 1.3M cause OOM
-# (dense temporaries during QC exceed 80GB). Use multi-GPU for those sizes.
-SIZES=(10000 50000 100000)
+# NOTE: 500k and 1.3M may OOM on single H100 (80GB VRAM).
+# The script will log the error and continue to the next size.
+SIZES=(10000 50000 100000 500000 1300000)
 N_REPEATS=5
 
 FAILED=0

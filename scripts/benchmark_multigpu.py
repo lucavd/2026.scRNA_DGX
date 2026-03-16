@@ -197,6 +197,10 @@ def run_pipeline(
     The pipeline uses dask_cuda for steps that support multi-GPU (PCA,
     neighbors) and falls back to single-GPU for other steps.
 
+    IMPORTANT: The Dask cluster is started ONLY for multi-GPU steps (PCA,
+    neighbors) to avoid CUDA memory conflicts between Dask workers' RMM
+    pools and direct CuPy operations on GPU 0.
+
     Args:
         adata_path: Path to the input h5ad file.
         n_gpus: Number of GPUs to use.
@@ -211,57 +215,51 @@ def run_pipeline(
     print(f"MULTI-GPU BENCHMARK — {adata_path.name} — {n_gpus} GPUs")
     print(f"{'=' * 80}")
 
-    # Set up dask cluster for multi-GPU
-    cluster, client = setup_dask_cluster(n_gpus)
     dask_setup_info = {
-        "n_workers": len(client.scheduler_info()["workers"]),
+        "n_workers": n_gpus,
         "rmm_pool_size": "10GB",
         "rmm_maximum_pool_size": "70GB",
     }
-
-    # Warm up all GPUs
-    gpu_warmup(n_gpus)
 
     print(
         f"  {'Step':25s} | {'Time':>8s} | {'RAM':>20s} | {'VRAM (total)':>20s}"
     )
     print(f"  {'-'*25}-+-{'-'*8}-+-{'-'*20}-+-{'-'*20}")
 
-    # 1. Data loading (read on CPU, transfer to GPU 0)
-    def load_and_transfer():
-        adata = sc.read_h5ad(adata_path)
-        rsc.get.anndata_to_GPU(adata)
-        return adata
+    # === PHASE 1: CPU steps (QC, normalize, HVG) ===
+    # The full matrix (e.g. 500k×27k genes) is too large for a single GPU.
+    # We do preprocessing on CPU with scanpy, then transfer the small
+    # HVG-subset matrix (e.g. 500k×2000) to GPU.
 
-    adata = time_step("data_loading", load_and_transfer, timings, memory, n_gpus)
+    # 1. Data loading (CPU only)
+    def load_data():
+        return sc.read_h5ad(adata_path)
+
+    adata = time_step("data_loading", load_data, timings, memory, n_gpus)
     print(f"    Loaded: {adata.n_obs:,} cells x {adata.n_vars:,} genes")
 
-    # 2. QC & filtering (single GPU)
+    # 2. QC & filtering (CPU — scanpy)
     def qc_filter():
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message="DataFrame is highly fragmented")
-            adata.var["mt"] = adata.var_names.str.startswith(("MT-", "mt-"))
-            rsc.pp.calculate_qc_metrics(adata, qc_vars=["mt"], log1p=False)
-            adata.obs = adata.obs.copy()
-            adata.var = adata.var.copy()
-            rsc.pp.filter_cells(adata, min_genes=200)
-            rsc.pp.filter_genes(adata, min_cells=3)
+        adata.var["mt"] = adata.var_names.str.startswith(("MT-", "mt-"))
+        sc.pp.calculate_qc_metrics(adata, qc_vars=["mt"], log1p=False, inplace=True)
+        sc.pp.filter_cells(adata, min_genes=200)
+        sc.pp.filter_genes(adata, min_cells=3)
 
     time_step("qc_filtering", qc_filter, timings, memory, n_gpus)
     n_cells_after_qc = adata.n_obs
     n_genes_after_qc = adata.n_vars
     print(f"    After QC: {n_cells_after_qc:,} cells x {n_genes_after_qc:,} genes")
 
-    # 3. Normalization (single GPU)
+    # 3. Normalization (CPU — scanpy)
     def normalize():
-        rsc.pp.normalize_total(adata, target_sum=1e4)
-        rsc.pp.log1p(adata)
+        sc.pp.normalize_total(adata, target_sum=1e4)
+        sc.pp.log1p(adata)
 
     time_step("normalization", normalize, timings, memory, n_gpus)
 
-    # 4. HVG selection (single GPU)
+    # 4. HVG selection (CPU — scanpy)
     def hvg_selection():
-        rsc.pp.highly_variable_genes(adata, n_top_genes=2000)
+        sc.pp.highly_variable_genes(adata, n_top_genes=2000)
 
     time_step("hvg_selection", hvg_selection, timings, memory, n_gpus)
 
@@ -270,25 +268,60 @@ def run_pipeline(
     hvg_hash = sha256_of_array(np.array(hvg_list, dtype=str))
     print(f"    HVGs selected: {n_hvgs}")
 
-    # Subset to HVGs
+    # Subset to HVGs (still on CPU)
     adata.raw = adata.copy()
     adata = adata[:, adata.var["highly_variable"]].copy()
+    print(f"    After HVG subset: {adata.n_obs:,} cells x {adata.n_vars:,} genes")
 
-    # 5. PCA (benefits from multi-GPU via dask-cuml)
-    def run_pca():
+    # === PHASE 2: Transfer to GPU + GPU steps ===
+    # Now the matrix is small (n_cells × 2000), fits easily on GPU.
+
+    # Warm up GPU 0
+    gpu_warmup(1)
+
+    # Transfer to GPU (no RMM pool needed — one-shot bulk allocation)
+    def transfer_to_gpu():
+        rsc.get.anndata_to_GPU(adata)
+
+    time_step("gpu_transfer", transfer_to_gpu, timings, memory, n_gpus)
+
+    # 5. Scale (single GPU)
+    def run_scale():
         rsc.pp.scale(adata, max_value=10)
+
+    time_step("scale", run_scale, timings, memory, n_gpus)
+
+    # Free CuPy cache before Dask workers allocate their RMM pools
+    cp.get_default_memory_pool().free_all_blocks()
+
+    # Start Dask cluster for multi-GPU steps
+    print(f"\n  Starting Dask CUDA cluster for multi-GPU steps...")
+    cluster_obj, client = setup_dask_cluster(n_gpus)
+
+    # 6. PCA (multi-GPU via dask-cuml)
+    def run_pca():
         rsc.pp.pca(adata, n_comps=50, random_state=RANDOM_SEED)
 
     time_step("pca", run_pca, timings, memory, n_gpus)
 
-    # 6. Neighbors (benefits from multi-GPU via dask-cuml)
+    # 7. Neighbors (multi-GPU via dask-cuml)
     time_step(
         "neighbors",
         lambda: rsc.pp.neighbors(adata, n_neighbors=15, n_pcs=50, random_state=RANDOM_SEED),
         timings, memory, n_gpus,
     )
 
-    # 7. Clustering (single GPU — cugraph)
+    # Shutdown Dask cluster
+    print("\n  Shutting down Dask cluster...")
+    client.close()
+    cluster_obj.close()
+
+    # Re-initialize RMM for remaining single-GPU steps
+    gc.collect()
+    cp.get_default_memory_pool().free_all_blocks()
+    rmm.reinitialize(pool_allocator=True, devices=0)
+
+    # 8. Clustering (single GPU — cugraph)
     cluster_results = {}
     for res in LEIDEN_RESOLUTIONS:
         key = f"leiden_{res}"
@@ -309,14 +342,14 @@ def run_pipeline(
         }
         print(f"    {key}: {n_clusters} clusters")
 
-    # 8. UMAP (single GPU)
+    # 9. UMAP (single GPU)
     time_step(
         "umap",
         lambda: rsc.tl.umap(adata, random_state=RANDOM_SEED),
         timings, memory, n_gpus,
     )
 
-    # 9. Differential expression
+    # 10. Differential expression
     def run_de():
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", message="DataFrame is highly fragmented")
@@ -329,11 +362,6 @@ def run_pipeline(
     # Transfer back to CPU
     print("\n  Transferring data back to CPU...")
     rsc.get.anndata_to_CPU(adata)
-
-    # Shutdown dask cluster
-    print("  Shutting down Dask cluster...")
-    client.close()
-    cluster.close()
 
     # Calculate total time
     timings["total"] = round(sum(timings.values()), 4)
@@ -372,10 +400,13 @@ def run_pipeline(
                 "dask_cluster": dask_setup_info,
                 "gpu_warmup": True,
                 "leiden_backend": "cugraph",
+                "cpu_steps": [
+                    "data_loading", "qc_filtering", "normalization",
+                    "hvg_selection",
+                ],
                 "multi_gpu_steps": ["pca", "neighbors"],
                 "single_gpu_steps": [
-                    "data_loading", "qc_filtering", "normalization",
-                    "hvg_selection", "leiden", "umap", "de_testing",
+                    "gpu_transfer", "scale", "leiden", "umap", "de_testing",
                 ],
             },
             "gpu_info": gpu_info,
