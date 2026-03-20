@@ -44,6 +44,11 @@ RANDOM_SEED = 42
 # Leiden clustering resolutions
 LEIDEN_RESOLUTIONS = [0.5, 1.0, 1.5]
 
+OOM_EXIT_CODE = 10
+INVALID_BENCHMARK_EXIT_CODE = 20
+DASK_RMM_POOL_SIZE = "2GB"
+DASK_RMM_MAXIMUM_POOL_SIZE = "70GB"
+
 # Census configuration
 CENSUS_VERSION = "2025-11-08"
 CENSUS_FILTER = (
@@ -239,6 +244,17 @@ def download_full_brain(data_dir: Path) -> Path:
 # Dask cluster setup
 # ---------------------------------------------------------------------------
 
+def _get_running_scheduler_workers(client) -> dict[str, str]:
+    def _inspect_scheduler(dask_scheduler):
+        return {
+            str(addr): str(getattr(worker_state, "name", "?"))
+            for addr, worker_state in dask_scheduler.workers.items()
+            if str(getattr(worker_state, "status", "")) == "Status.running"
+        }
+
+    return client.run_on_scheduler(_inspect_scheduler)
+
+
 def setup_dask_cluster(n_gpus: int) -> tuple:
     """Set up a Dask CUDA cluster with N GPUs.
 
@@ -261,17 +277,52 @@ def setup_dask_cluster(n_gpus: int) -> tuple:
     cluster = LocalCUDACluster(
         CUDA_VISIBLE_DEVICES=device_list,
         n_workers=n_gpus,
-        rmm_pool_size="10GB",
-        rmm_maximum_pool_size="70GB",
+        rmm_pool_size=DASK_RMM_POOL_SIZE,
+        rmm_maximum_pool_size=DASK_RMM_MAXIMUM_POOL_SIZE,
     )
-    client = Client(cluster)
-    n_workers = len(client.scheduler_info()["workers"])
-    print(f"  Dask dashboard: {client.dashboard_link}")
-    print(f"  Workers: {n_workers}")
-    if n_workers != n_gpus:
-        print(f"  WARNING: expected {n_gpus} workers but got {n_workers}!")
-
-    return cluster, client
+    client = None
+    try:
+        client = Client(cluster)
+        deadline = time.monotonic() + 120
+        stable_checks = 0
+        worker_addresses = []
+        n_workers = 0
+        while time.monotonic() < deadline:
+            workers = _get_running_scheduler_workers(client)
+            worker_addresses = sorted(workers)
+            n_workers = len(worker_addresses)
+            if n_workers == n_gpus:
+                stable_checks += 1
+                if stable_checks >= 3:
+                    break
+            else:
+                stable_checks = 0
+            time.sleep(1)
+        print(f"  Dask dashboard: {client.dashboard_link}")
+        print(f"  Workers: {n_workers}")
+        print(f"  Worker addresses: {worker_addresses}")
+        if n_workers != n_gpus:
+            raise RuntimeError(
+                f"Dask CUDA cluster started with {n_workers} workers, expected {n_gpus}",
+            )
+        return cluster, client
+    except Exception as e:
+        worker_addresses = []
+        if client is not None:
+            try:
+                worker_addresses = sorted(_get_running_scheduler_workers(client))
+            except Exception:
+                worker_addresses = []
+            client.close()
+        print(
+            "  GPU VRAM during Dask startup failure: "
+            + ", ".join(f"GPU {i}: {get_vram_used_gb(i):.1f} GB" for i in range(n_gpus)),
+        )
+        cluster.close()
+        raise RuntimeError(
+            f"Dask CUDA cluster did not reach {n_gpus} workers; got {len(worker_addresses)} "
+            f"workers: {worker_addresses}",
+        ) from e
 
 
 def gpu_warmup(n_gpus: int) -> None:
@@ -286,6 +337,128 @@ def gpu_warmup(n_gpus: int) -> None:
     cp.cuda.Device(0).use()
     cp.get_default_memory_pool().free_all_blocks()
     print("done")
+
+
+# ---------------------------------------------------------------------------
+# Distributed covariance PCA
+# ---------------------------------------------------------------------------
+
+def _distributed_covariance_pca(
+    adata: sc.AnnData,
+    n_gpus: int,
+    n_comps: int = 50,
+) -> None:
+    """Compute PCA via covariance method distributed across all GPUs.
+
+    Instead of putting the entire dense matrix on GPU 0 (which OOMs at ~2M+
+    cells), this distributes data chunks across all GPUs.  Each GPU computes
+    its local covariance contribution (X_i.T @ X_i), the contributions are
+    summed on GPU 0, eigendecomposed, and each GPU projects its chunk.
+
+    Mathematically equivalent to standard PCA: eigh(X.T @ X / (n-1)).
+
+    Memory per GPU: ~(n_cells/n_gpus × n_genes × 4B) + workspace.
+    For 3.4M cells × 2000 genes on 8 GPUs: ~3.2 GB per GPU.
+
+    Args:
+        adata: AnnData with dense scaled .X on CPU (float32).
+        n_gpus: Number of GPUs to distribute across.
+        n_comps: Number of PCA components (default: 50).
+    """
+    X_np = np.ascontiguousarray(adata.X, dtype=np.float32)
+    n_cells, n_genes = X_np.shape
+
+    # Split into chunks — one per GPU
+    chunk_size = n_cells // n_gpus
+    remainder = n_cells % n_gpus
+    chunks = []
+    offset = 0
+    for i in range(n_gpus):
+        end = offset + chunk_size + (1 if i < remainder else 0)
+        chunks.append(X_np[offset:end])
+        offset = end
+
+    print(f"    Scatter: {n_gpus} chunks, ~{chunk_size:,} rows each, "
+          f"{chunks[0].nbytes / (1024**3):.2f} GB/chunk")
+
+    # Transfer each chunk to its own GPU
+    gpu_chunks = []
+    for i, chunk in enumerate(chunks):
+        with cp.cuda.Device(i):
+            gpu_chunks.append(cp.asarray(chunk))
+    cp.cuda.Stream.null.synchronize()
+
+    del chunks
+    gc.collect()
+
+    # Step 1: Each GPU computes local X_i.T @ X_i (2000×2000 = 16 MB)
+    local_covs = []
+    for i, X_i in enumerate(gpu_chunks):
+        with cp.cuda.Device(i):
+            local_covs.append(X_i.T @ X_i)
+    cp.cuda.Stream.null.synchronize()
+
+    # Step 2: Sum covariance contributions on GPU 0
+    with cp.cuda.Device(0):
+        cov_total = cp.zeros((n_genes, n_genes), dtype=np.float32)
+        for i, cov_i in enumerate(local_covs):
+            if i == 0:
+                cov_total += cov_i
+            else:
+                cov_total += cp.asarray(cov_i)
+        cov_total /= (n_cells - 1)
+    cp.cuda.Stream.null.synchronize()
+    del local_covs
+
+    # Step 3: Eigendecomposition on GPU 0 (2000×2000 — trivial)
+    with cp.cuda.Device(0):
+        eigenvalues, eigenvectors = cp.linalg.eigh(cov_total)
+        # eigh returns ascending — reverse for descending
+        eigenvalues = cp.ascontiguousarray(eigenvalues[::-1][:n_comps])
+        eigenvectors = cp.ascontiguousarray(eigenvectors[:, ::-1][:, :n_comps])
+        total_var = float(cp.trace(cov_total))
+        explained_var = eigenvalues / total_var
+    cp.cuda.Stream.null.synchronize()
+    del cov_total
+
+    print(f"    Explained variance ({n_comps} PCs): {float(explained_var.sum()):.4f}")
+
+    # Step 4: Project each chunk on its GPU
+    pca_chunks = []
+    for i, X_i in enumerate(gpu_chunks):
+        with cp.cuda.Device(i):
+            V_i = cp.asarray(eigenvectors) if i != 0 else eigenvectors
+            pca_chunks.append(X_i @ V_i)
+    cp.cuda.Stream.null.synchronize()
+
+    # Free GPU data chunks
+    del gpu_chunks
+    for i in range(n_gpus):
+        with cp.cuda.Device(i):
+            cp.get_default_memory_pool().free_all_blocks()
+
+    # Gather PCA results to CPU
+    pca_cpu = []
+    for i, pca_i in enumerate(pca_chunks):
+        with cp.cuda.Device(i):
+            pca_cpu.append(cp.asnumpy(pca_i))
+    X_pca = np.vstack(pca_cpu)
+    del pca_chunks, pca_cpu
+
+    # Store in adata (scanpy-compatible format)
+    adata.obsm["X_pca"] = X_pca
+    adata.uns["pca"] = {
+        "variance": cp.asnumpy(eigenvalues),
+        "variance_ratio": cp.asnumpy(explained_var),
+        "params": {
+            "n_comps": n_comps,
+            "method": "covariance_distributed",
+            "n_gpus": n_gpus,
+            "random_state": RANDOM_SEED,
+        },
+    }
+
+    print(f"    PCA stored: {X_pca.shape} ({X_pca.nbytes / (1024**2):.0f} MB)")
 
 
 # ---------------------------------------------------------------------------
@@ -351,17 +524,21 @@ def resize_dataset(adata: sc.AnnData, target_cells: int) -> sc.AnnData:
     return result
 
 
-def run_pipeline(adata_path: Path, n_gpus: int, target_cells: int = 0) -> tuple:
+def run_pipeline(
+    adata_path: Path, n_gpus: int, target_cells: int = 0, skip_de: bool = False,
+) -> tuple:
     """Run the full hybrid CPU+GPU pipeline on all available GPUs.
 
-    Phase 1 (CPU): data loading, QC, normalization, HVG selection
-    Phase 2 (GPU): transfer HVG subset, scale, PCA (multi-GPU), neighbors
-                    (multi-GPU), leiden, UMAP, DE (single GPU)
+    Phase 1 (CPU): data loading, QC, normalization, HVG selection, scale
+    Phase 2 (GPU): PCA (scatter across all GPUs), lean transfer, neighbors,
+                    leiden, UMAP
+    Phase 3 (CPU): DE with Wilcoxon on all genes (unless --skip-de)
 
     Args:
         adata_path: Path to the input h5ad file.
         n_gpus: Number of GPUs to use.
         target_cells: If > 0, resize dataset to this many cells (replicate/subsample).
+        skip_de: If True, skip differential expression testing.
 
     Returns:
         Tuple of (result dict, adata on CPU, hvg_list).
@@ -382,8 +559,8 @@ def run_pipeline(adata_path: Path, n_gpus: int, target_cells: int = 0) -> tuple:
 
     dask_setup_info = {
         "n_workers": n_gpus,
-        "rmm_pool_size": "10GB",
-        "rmm_maximum_pool_size": "70GB",
+        "rmm_pool_size": DASK_RMM_POOL_SIZE,
+        "rmm_maximum_pool_size": DASK_RMM_MAXIMUM_POOL_SIZE,
     }
 
     print(
@@ -435,38 +612,65 @@ def run_pipeline(adata_path: Path, n_gpus: int, target_cells: int = 0) -> tuple:
     print(f"    After HVG subset: {adata.n_obs:,} cells x {adata.n_vars:,} genes")
 
     # === PHASE 2: GPU ===
-    gpu_warmup(1)
+    # Strategy: scale on CPU (2 TB RAM), distribute data across all GPUs for
+    # PCA (covariance method), then transfer to GPU 0 for neighbors/clustering.
+    # This avoids the GPU 0 bottleneck where scale+PCA exceeded 80 GB VRAM.
 
-    def transfer_to_gpu():
-        rsc.get.anndata_to_GPU(adata)
+    # Scale on CPU — converts sparse → dense (25 GB for 3.4M cells is trivial
+    # on 2 TB RAM; on GPU 0 it caused OOM at 3.4M).
+    def cpu_scale():
+        if hasattr(adata.X, "toarray"):
+            adata.X = adata.X.toarray()
+        sc.pp.scale(adata, max_value=10)
 
-    time_step("gpu_transfer", transfer_to_gpu, timings, memory, n_gpus)
+    time_step("scale", cpu_scale, timings, memory, n_gpus)
 
-    def run_scale():
-        rsc.pp.scale(adata, max_value=10)
+    # Start Dask CUDA cluster
+    print(f"\n  Starting Dask CUDA cluster for multi-GPU PCA...")
+    cluster_obj = None
+    client = None
+    try:
+        cluster_obj, client = setup_dask_cluster(n_gpus)
+        workers = _get_running_scheduler_workers(client)
+        dask_setup_info["actual_n_workers"] = len(workers)
+        dask_setup_info["worker_addresses"] = sorted(workers)
+        print(
+            "  GPU VRAM after Dask startup: "
+            + ", ".join(f"GPU {i}: {get_vram_used_gb(i):.1f} GB" for i in range(n_gpus)),
+        )
 
-    time_step("scale", run_scale, timings, memory, n_gpus)
+        # Distributed PCA: scatter data across all GPUs, covariance method
+        def scatter_pca():
+            _distributed_covariance_pca(adata, n_gpus, n_comps=50)
 
-    cp.get_default_memory_pool().free_all_blocks()
+        time_step("pca", scatter_pca, timings, memory, n_gpus)
 
-    # Multi-GPU steps via Dask
-    print(f"\n  Starting Dask CUDA cluster for multi-GPU steps...")
-    cluster_obj, client = setup_dask_cluster(n_gpus)
+        # Lean GPU transfer: replace scaled X with empty sparse matrix.
+        # After PCA, adata.X (25 GB dense) is no longer needed — neighbors
+        # only uses X_pca (0.6 GB in obsm). This drops GPU 0 from ~29 GB
+        # to ~4 GB, dramatically increasing the cell count limit.
+        import scipy.sparse as sp
+        print(f"    Dropping adata.X ({adata.X.nbytes/(1024**3):.1f} GB) — not needed after PCA")
+        adata.X = sp.csr_matrix((adata.n_obs, adata.n_vars), dtype=np.float32)
 
-    def run_pca():
-        rsc.pp.pca(adata, n_comps=50, random_state=RANDOM_SEED)
+        def transfer_to_gpu():
+            rsc.get.anndata_to_GPU(adata)
 
-    time_step("pca", run_pca, timings, memory, n_gpus)
+        time_step("gpu_transfer", transfer_to_gpu, timings, memory, n_gpus)
 
-    time_step(
-        "neighbors",
-        lambda: rsc.pp.neighbors(adata, n_neighbors=15, n_pcs=50, random_state=RANDOM_SEED),
-        timings, memory, n_gpus,
-    )
-
-    print("\n  Shutting down Dask cluster...")
-    client.close()
-    cluster_obj.close()
+        # Neighbors on GPU 0 — uses only PCA coordinates (n_cells × 50)
+        time_step(
+            "neighbors",
+            lambda: rsc.pp.neighbors(adata, n_neighbors=15, n_pcs=50, random_state=RANDOM_SEED),
+            timings, memory, n_gpus,
+        )
+    finally:
+        if client is not None or cluster_obj is not None:
+            print("\n  Shutting down Dask cluster...")
+        if client is not None:
+            client.close()
+        if cluster_obj is not None:
+            cluster_obj.close()
 
     gc.collect()
     cp.get_default_memory_pool().free_all_blocks()
@@ -499,18 +703,24 @@ def run_pipeline(adata_path: Path, n_gpus: int, target_cells: int = 0) -> tuple:
         timings, memory, n_gpus,
     )
 
-    def run_de():
-        with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", message="DataFrame is highly fragmented")
-            rsc.tl.rank_genes_groups(
-                adata, groupby="leiden_1.0", method="wilcoxon", use_raw=True,
-            )
-
-    time_step("de_testing", run_de, timings, memory, n_gpus)
-
     # Transfer back to CPU
     print("\n  Transferring data back to CPU...")
     rsc.get.anndata_to_CPU(adata)
+
+    # DE: run on CPU with all genes (raw.X is 121 GB sparse at 3.4M cells —
+    # too large for a single GPU). Skip in binary search mode (--skip-de).
+    if skip_de:
+        print("  DE skipped (--skip-de)")
+        timings["de_testing"] = 0.0
+    else:
+        def run_de():
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message="DataFrame is highly fragmented")
+                sc.tl.rank_genes_groups(
+                    adata, groupby="leiden_1.0", method="wilcoxon", use_raw=True,
+                )
+
+        time_step("de_testing", run_de, timings, memory, n_gpus)
 
     # Total
     timings["total"] = round(sum(timings.values()), 4)
@@ -561,12 +771,13 @@ def run_pipeline(adata_path: Path, n_gpus: int, target_cells: int = 0) -> tuple:
                 "leiden_backend": "cugraph",
                 "cpu_steps": [
                     "data_loading", "qc_filtering", "normalization",
-                    "hvg_selection",
+                    "hvg_selection", "scale",
                 ],
-                "multi_gpu_steps": ["pca", "neighbors"],
+                "multi_gpu_steps": ["pca"],
                 "single_gpu_steps": [
-                    "gpu_transfer", "scale", "leiden", "umap", "de_testing",
+                    "gpu_transfer", "neighbors", "leiden", "umap", "de_testing",
                 ],
+                "pca_method": "covariance_distributed",
             },
             "gpu_info": gpu_info,
             "input_file": str(adata_path),
@@ -639,8 +850,20 @@ Examples:
         help="Binary search for max cells before OOM. Runs multiple passes automatically.",
     )
     parser.add_argument(
+        "--fine-low", type=int, default=0,
+        help="Skip coarse search; start fine binary search from this lower bound (success)",
+    )
+    parser.add_argument(
+        "--fine-high", type=int, default=0,
+        help="Skip coarse search; start fine binary search from this upper bound (fail)",
+    )
+    parser.add_argument(
         "--download", action="store_true",
         help="Download the full dataset from CELLxGENE Census if not present",
+    )
+    parser.add_argument(
+        "--skip-de", action="store_true",
+        help="Skip differential expression (for binary search — DE is slow on CPU at >3M cells)",
     )
     return parser.parse_args()
 
@@ -673,33 +896,47 @@ def main() -> None:
         # In find-limit mode the parent process must NOT touch GPUs at all.
         # Each attempt runs in a clean subprocess with its own CUDA context.
         print(f"\nSystem RAM: {psutil.virtual_memory().total / (1024**3):.0f} GB")
-        run_find_limit(adata_path, n_gpus, output_dir)
+        run_find_limit(adata_path, n_gpus, output_dir, args.fine_low, args.fine_high)
     else:
         # Single-run mode: initialize GPU and run directly
         init_nvml()
+        try:
+            gpu_info = get_gpu_info(n_gpus)
+            print(f"\nDGX Configuration:")
+            for gpu in gpu_info["gpus"]:
+                print(f"  GPU {gpu['device_index']}: {gpu['gpu_name']} ({gpu['gpu_vram_total_gb']} GB)")
+            print(f"  Driver: {gpu_info['driver_version']}")
+            print(f"  Total VRAM: {sum(g['gpu_vram_total_gb'] for g in gpu_info['gpus']):.0f} GB")
+            print(f"  System RAM: {psutil.virtual_memory().total / (1024**3):.0f} GB")
 
-        gpu_info = get_gpu_info(n_gpus)
-        print(f"\nDGX Configuration:")
-        for gpu in gpu_info["gpus"]:
-            print(f"  GPU {gpu['device_index']}: {gpu['gpu_name']} ({gpu['gpu_vram_total_gb']} GB)")
-        print(f"  Driver: {gpu_info['driver_version']}")
-        print(f"  Total VRAM: {sum(g['gpu_vram_total_gb'] for g in gpu_info['gpus']):.0f} GB")
-        print(f"  System RAM: {psutil.virtual_memory().total / (1024**3):.0f} GB")
+            sc.settings.verbosity = 0
 
-        sc.settings.verbosity = 0
-
-        result = run_single(adata_path, n_gpus, args.target_cells, output_dir)
-        if result is None:
+            result = run_single(adata_path, n_gpus, args.target_cells, output_dir, args.skip_de)
+            if result is None:
+                raise SystemExit(OOM_EXIT_CODE)
+        except RuntimeError as e:
+            message = str(e).lower()
+            if any(token in message for token in (
+                "did not reach",
+                "expected 8",
+                "expected workers",
+                "cluster started with",
+            )):
+                print(
+                    "\nINVALID BENCHMARK RUN: max-power requires all requested "
+                    f"{n_gpus} Dask workers to be active. {e}",
+                )
+                raise SystemExit(INVALID_BENCHMARK_EXIT_CODE) from e
+            raise
+        finally:
             shutdown_nvml()
-            raise SystemExit(1)
-
-        shutdown_nvml()
 
     print("\nDone!")
 
 
 def run_single(
     adata_path: Path, n_gpus: int, target_cells: int, output_dir: Path,
+    skip_de: bool = False,
 ) -> dict | None:
     """Run a single benchmark and save results.
 
@@ -707,12 +944,26 @@ def run_single(
         Result dict if successful, None if OOM.
     """
     try:
-        result, adata, hvg_list = run_pipeline(adata_path, n_gpus, target_cells)
-    except (MemoryError, cp.cuda.memory.OutOfMemoryError, RuntimeError) as e:
+        result, adata, hvg_list = run_pipeline(adata_path, n_gpus, target_cells, skip_de)
+    except (MemoryError, cp.cuda.memory.OutOfMemoryError) as e:
         print(f"\n  OOM ERROR at {target_cells:,} cells: {e}")
         gc.collect()
         cp.get_default_memory_pool().free_all_blocks()
         return None
+    except RuntimeError as e:
+        message = str(e).lower()
+        if any(token in message for token in (
+            "out_of_memory",
+            "cudaerrormemoryallocation",
+            "std::bad_alloc",
+            "rmm::bad_alloc",
+            "failed to allocate",
+        )):
+            print(f"\n  OOM ERROR at {target_cells:,} cells: {e}")
+            gc.collect()
+            cp.get_default_memory_pool().free_all_blocks()
+            return None
+        raise
 
     # Save results
     n_cells = result["metadata"]["n_cells_input"]
@@ -774,15 +1025,31 @@ def _run_in_subprocess(
         "--output-dir", output_dir,
         "--n-gpus", str(n_gpus),
         "--target-cells", str(target_cells),
+        "--skip-de",  # DE is too slow for binary search; run separately
     ]
 
     print(f"  Launching subprocess: target={target_cells:,} cells, {n_gpus} GPUs")
-    result = _sp.run(cmd, timeout=7200)  # 2h timeout per attempt
+    result = _sp.run(cmd, timeout=86400)  # 24h timeout per attempt
+    if result.returncode == 0:
+        return True
+    if result.returncode == OOM_EXIT_CODE:
+        return False
+    if result.returncode == INVALID_BENCHMARK_EXIT_CODE:
+        raise RuntimeError(
+            "Benchmark subprocess failed because the 8-GPU Dask cluster did not "
+            f"start completely for target={target_cells:,} cells. This run is "
+            "invalid and find-limit must stop.",
+        )
+    raise RuntimeError(
+        f"Benchmark subprocess failed with exit code {result.returncode} "
+        f"for target={target_cells:,} cells",
+    )
 
-    return result.returncode == 0
 
-
-def run_find_limit(adata_path: Path, n_gpus: int, output_dir: Path) -> None:
+def run_find_limit(
+    adata_path: Path, n_gpus: int, output_dir: Path,
+    fine_low: int = 0, fine_high: int = 0,
+) -> None:
     """Binary search for the maximum number of cells before OOM.
 
     Each attempt runs in an isolated subprocess so GPU memory is fully released
@@ -791,6 +1058,8 @@ def run_find_limit(adata_path: Path, n_gpus: int, output_dir: Path) -> None:
     Strategy:
       1. Coarse phase: try N, 2N, 3N, ... to find where it fails
       2. Fine phase: binary search between last-success and first-fail with 100k steps
+
+    If fine_low and fine_high are both > 0, skip coarse and go directly to fine.
     """
     # Find the script path for subprocess invocation
     script_path = str(Path(__file__).resolve())
@@ -803,33 +1072,39 @@ def run_find_limit(adata_path: Path, n_gpus: int, output_dir: Path) -> None:
     print(f"Source dataset: {n_source:,} cells")
     print(f"{'=' * 80}")
 
-    # Phase 1: coarse search — big jumps to find the crash zone
-    coarse_targets = [n_source]
-    step = n_source
-    while coarse_targets[-1] + step <= 20_000_000:
-        coarse_targets.append(coarse_targets[-1] + step)
-
     last_success = 0
     first_fail = 0
 
-    print(f"\n--- Phase 1: Coarse search (step ~{n_source:,}) ---")
-    for target in coarse_targets:
-        print(f"\n>>> Trying {target:,} cells...")
-        success = _run_in_subprocess(
-            script_path, str(adata_path.parent), str(output_dir),
-            n_gpus, target,
-        )
-        if success:
-            last_success = target
-            print(f"  >>> SUCCESS at {target:,} cells")
-        else:
-            first_fail = target
-            print(f"  >>> FAILED at {target:,} cells")
-            break
+    # Skip coarse phase if bounds are provided
+    if fine_low > 0 and fine_high > 0:
+        last_success = fine_low
+        first_fail = fine_high
+        print(f"\n--- Skipping coarse search (provided bounds: {fine_low:,}–{fine_high:,}) ---")
     else:
-        print(f"\n  All targets succeeded up to {coarse_targets[-1]:,} cells!")
-        print(f"  The DGX can handle at least {coarse_targets[-1]:,} cells.")
-        return
+        # Phase 1: coarse search — big jumps to find the crash zone
+        coarse_targets = [n_source]
+        step = n_source
+        while coarse_targets[-1] + step <= 20_000_000:
+            coarse_targets.append(coarse_targets[-1] + step)
+
+        print(f"\n--- Phase 1: Coarse search (step ~{n_source:,}) ---")
+        for target in coarse_targets:
+            print(f"\n>>> Trying {target:,} cells...")
+            success = _run_in_subprocess(
+                script_path, str(adata_path.parent), str(output_dir),
+                n_gpus, target,
+            )
+            if success:
+                last_success = target
+                print(f"  >>> SUCCESS at {target:,} cells")
+            else:
+                first_fail = target
+                print(f"  >>> FAILED at {target:,} cells")
+                break
+        else:
+            print(f"\n  All targets succeeded up to {coarse_targets[-1]:,} cells!")
+            print(f"  The DGX can handle at least {coarse_targets[-1]:,} cells.")
+            return
 
     # Phase 2: fine search — binary search with 100k steps
     print(f"\n--- Phase 2: Fine search between {last_success:,} and {first_fail:,} ---")
@@ -861,6 +1136,22 @@ def run_find_limit(adata_path: Path, n_gpus: int, output_dir: Path) -> None:
     print(f"  First OOM at:   {high:,}")
     print(f"  Configuration:  {n_gpus}× NVIDIA H100 80GB, ~1800 GB RAM")
     print(f"  Source dataset: {n_source:,} cells (replicated to reach limit)")
+    print(f"  PCA method:     covariance_distributed (scatter across {n_gpus} GPUs)")
+
+    # Save summary to JSON
+    summary = {
+        "max_cells": low,
+        "first_oom_at": high,
+        "n_gpus": n_gpus,
+        "source_cells": n_source,
+        "pca_method": "covariance_distributed",
+        "rmm_pool_size": DASK_RMM_POOL_SIZE,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    summary_path = output_dir / f"maxpower_limit_{n_gpus}gpu.json"
+    with open(summary_path, "w") as f:
+        json.dump(summary, f, indent=2)
+    print(f"  Summary saved:  {summary_path}")
 
 
 if __name__ == "__main__":

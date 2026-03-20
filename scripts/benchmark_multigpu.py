@@ -147,6 +147,17 @@ def get_gpu_info(n_gpus: int) -> dict:
     }
 
 
+def _get_running_scheduler_workers(client) -> dict[str, str]:
+    def _inspect_scheduler(dask_scheduler):
+        return {
+            str(addr): str(getattr(worker_state, "name", "?"))
+            for addr, worker_state in dask_scheduler.workers.items()
+            if str(getattr(worker_state, "status", "")) == "Status.running"
+        }
+
+    return client.run_on_scheduler(_inspect_scheduler)
+
+
 def setup_dask_cluster(n_gpus: int) -> tuple:
     """Set up a Dask CUDA cluster with N GPUs.
 
@@ -161,17 +172,54 @@ def setup_dask_cluster(n_gpus: int) -> tuple:
 
     device_list = ",".join(str(i) for i in range(n_gpus))
 
+    cuda_env = os.environ.get("CUDA_VISIBLE_DEVICES", "not set")
+    print(f"  CUDA_VISIBLE_DEVICES env: {cuda_env}")
     print(f"  Setting up Dask CUDA cluster with {n_gpus} GPUs ({device_list})...")
     cluster = LocalCUDACluster(
         CUDA_VISIBLE_DEVICES=device_list,
+        n_workers=n_gpus,
         rmm_pool_size="10GB",
         rmm_maximum_pool_size="70GB",
     )
-    client = Client(cluster)
-    print(f"  Dask dashboard: {client.dashboard_link}")
-    print(f"  Workers: {len(client.scheduler_info()['workers'])}")
-
-    return cluster, client
+    client = None
+    try:
+        client = Client(cluster)
+        deadline = time.monotonic() + 120
+        stable_checks = 0
+        worker_addresses = []
+        n_workers = 0
+        while time.monotonic() < deadline:
+            workers = _get_running_scheduler_workers(client)
+            worker_addresses = sorted(workers)
+            n_workers = len(worker_addresses)
+            if n_workers == n_gpus:
+                stable_checks += 1
+                if stable_checks >= 3:
+                    break
+            else:
+                stable_checks = 0
+            time.sleep(1)
+        print(f"  Dask dashboard: {client.dashboard_link}")
+        print(f"  Workers: {n_workers}")
+        print(f"  Worker addresses: {worker_addresses}")
+        if n_workers != n_gpus:
+            raise RuntimeError(
+                f"Dask CUDA cluster started with {n_workers} workers, expected {n_gpus}",
+            )
+        return cluster, client
+    except Exception as e:
+        worker_addresses = []
+        if client is not None:
+            try:
+                worker_addresses = sorted(_get_running_scheduler_workers(client))
+            except Exception:
+                worker_addresses = []
+            client.close()
+        cluster.close()
+        raise RuntimeError(
+            f"Dask CUDA cluster did not reach {n_gpus} workers; got {len(worker_addresses)} "
+            f"workers: {worker_addresses}",
+        ) from e
 
 
 def gpu_warmup(n_gpus: int) -> None:
@@ -293,28 +341,42 @@ def run_pipeline(
 
     # Free CuPy cache before Dask workers allocate their RMM pools
     cp.get_default_memory_pool().free_all_blocks()
+    print(
+        "  GPU VRAM after scale: "
+        + ", ".join(f"GPU {i}: {get_vram_used_gb(i):.1f} GB" for i in range(n_gpus)),
+    )
 
     # Start Dask cluster for multi-GPU steps
     print(f"\n  Starting Dask CUDA cluster for multi-GPU steps...")
-    cluster_obj, client = setup_dask_cluster(n_gpus)
+    cluster_obj = None
+    client = None
+    try:
+        cluster_obj, client = setup_dask_cluster(n_gpus)
+        workers = _get_running_scheduler_workers(client)
+        dask_setup_info["actual_n_workers"] = len(workers)
+        dask_setup_info["worker_addresses"] = sorted(workers)
+        print(
+            "  GPU VRAM after Dask startup: "
+            + ", ".join(f"GPU {i}: {get_vram_used_gb(i):.1f} GB" for i in range(n_gpus)),
+        )
 
-    # 6. PCA (multi-GPU via dask-cuml)
-    def run_pca():
-        rsc.pp.pca(adata, n_comps=50, random_state=RANDOM_SEED)
+        def run_pca():
+            rsc.pp.pca(adata, n_comps=50, random_state=RANDOM_SEED)
 
-    time_step("pca", run_pca, timings, memory, n_gpus)
+        time_step("pca", run_pca, timings, memory, n_gpus)
 
-    # 7. Neighbors (multi-GPU via dask-cuml)
-    time_step(
-        "neighbors",
-        lambda: rsc.pp.neighbors(adata, n_neighbors=15, n_pcs=50, random_state=RANDOM_SEED),
-        timings, memory, n_gpus,
-    )
-
-    # Shutdown Dask cluster
-    print("\n  Shutting down Dask cluster...")
-    client.close()
-    cluster_obj.close()
+        time_step(
+            "neighbors",
+            lambda: rsc.pp.neighbors(adata, n_neighbors=15, n_pcs=50, random_state=RANDOM_SEED),
+            timings, memory, n_gpus,
+        )
+    finally:
+        if client is not None or cluster_obj is not None:
+            print("\n  Shutting down Dask cluster...")
+        if client is not None:
+            client.close()
+        if cluster_obj is not None:
+            cluster_obj.close()
 
     # Re-initialize RMM for remaining single-GPU steps
     gc.collect()

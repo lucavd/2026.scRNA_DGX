@@ -10,10 +10,10 @@
 #SBATCH --mail-type=ALL
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=100
+#SBATCH --cpus-per-task=200
 #SBATCH --mem=1800G
 #SBATCH --gres=gpu:8
-#SBATCH --time=12:00:00
+#SBATCH --time=7-00:00:00
 #SBATCH --nodelist=poddgx02
 
 # Load required modules
@@ -70,12 +70,19 @@ echo "Data file: ${DATA_FILE}"
 echo "File size: $(ls -lh "${DATA_FILE}" | awk '{print $5}')"
 echo ""
 
+# Build find-limit command — support optional FINE_LOW/FINE_HIGH to skip coarse search
+FIND_LIMIT_ARGS=(--find-limit)
+if [ -n "${FINE_LOW}" ] && [ -n "${FINE_HIGH}" ]; then
+    FIND_LIMIT_ARGS+=(--fine-low "${FINE_LOW}" --fine-high "${FINE_HIGH}")
+    echo "Fine search bounds: ${FINE_LOW} — ${FINE_HIGH}"
+fi
+
 # Run find-limit mode: binary search for max cells
 run_in_container "${CONTAINER_PYTHON}" -u "${WORKDIR}/scripts/benchmark_maxpower.py" \
     --data-dir "${WORKDIR}/data" \
     --output-dir "${WORKDIR}/results" \
     --n-gpus 8 \
-    --find-limit
+    "${FIND_LIMIT_ARGS[@]}"
 
 echo ""
 echo "=== Results ==="

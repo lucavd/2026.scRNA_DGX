@@ -57,9 +57,10 @@ The user is NOT a DGX/HPC expert. This is one of the first times using this infr
 5. **Concordance script**: Compare CPU vs GPU results from steps 3–4. ✅ DONE
 6. **Push to Docker Hub, pull on DGX as Singularity**: Smoke test (10k cells, 1 GPU). ✅ DONE
 7. **SLURM jobs for full-scale CPU benchmark**: All dataset sizes × 5 repeats. ✅ DONE
-8. **SLURM jobs for GPU scaling**: 1/2/4/8 GPU on all datasets × 5 repeats. ✅ DONE
+8. **SLURM jobs for GPU scaling**: 1/2/4/8 GPU on all datasets × 5 repeats. ✅ DONE (note: 8-GPU Dask worker count reporting bug FIXED — all runs used 8 workers, only the readiness check was wrong)
 9. **Analysis and figures**: 6 publication-ready figures + summary table. ✅ DONE (locally)
-10. **Max-power stress test**: Download full ~3.6M mouse brain, find DGX cell limit via binary search. 🔄 IN PROGRESS
+10. **Max-power stress test**: ✅ DONE — **10.3M cells** is the DGX limit (8×H100, 2 TB RAM). Bottleneck is CPU RAM (465/2048 GB at 10.3M), not GPU VRAM (49/640 GB = 7.6%). Optimizations: scatter covariance PCA, lean GPU transfer, RMM pool 2GB. Binary search: 12M FAIL (leiden OOM), 13.7M FAIL (scale OOM).
+10b. **DE benchmark at scale**: ✅ DONE — 7 tests on 3.4M cells × 41k genes × 81 clusters. Pseudo-bulk fastest (128s, 44× vs CPU t-test). Wilcoxon GPU (826s) beats t-test GPU (1656s). Multi-GPU ≈ single-GPU for DE (I/O bound).
 11. **Manuscript (scRNA-seq part)**: Write the single-cell sections of the full-length paper. ⏳ TODO
 12. **Spatial omics benchmark**: Extend to Visium/Visium HD/Xenium — see `SPATIAL.md`. ⏳ TODO (after step 11)
 13. **Manuscript (spatial part + finalize)**: Add spatial sections, condense to 4–5 pages for CIBB 2026. ⏳ TODO
@@ -455,6 +456,8 @@ client = Client(cluster)
 
 SLURM `--gres=gpu:N` controls how many GPUs are visible. Create separate submit scripts for each GPU count.
 
+**KNOWN ISSUE (FIXED) — Dask-CUDA worker count reporting**: `client.scheduler_info()["workers"]` returned only 5 out of 8 workers, but all 8 were actually running and used in computation. Root cause: stale/incomplete client-side cache — a **reporting bug only**, not an execution bug. **Fix**: replaced `client.scheduler_info()["workers"]` with `client.run_on_scheduler()` that reads worker state directly from the scheduler, filtering only `Status.running` workers. Applied to `benchmark_maxpower.py` and `benchmark_multigpu.py`. SLURM 8-GPU scripts also updated to `--cpus-per-task=200` (from 100). **All Step 8 "8 GPU" benchmarks correctly used 8 workers** — only the readiness check was wrong.
+
 ---
 
 ## Project Structure
@@ -650,6 +653,146 @@ Use matplotlib with a clean, publication-ready style. Save as both PDF and PNG (
 
 10. **CUDA version compatibility**: The DGX H100 nodes run CUDA 12.x. Ensure the container's CUDA version is compatible (12.x). Do not use CUDA 11.x containers — H100 requires CUDA 12+.
 
+11. **GPU memory bottleneck at scale (3.4M cells — SOLVED)**: The original pipeline put the entire dense HVG matrix on GPU 0 via `anndata_to_GPU()`. After scale, GPU 0 held ~36 GB (10 GB RMM pool + 27 GB data). PCA tried to allocate ~51 GB for SVD → OOM (87 GB > 80 GB). **Fix**: distributed covariance PCA — scale on CPU, scatter data chunks across all 8 GPUs (~3.2 GB each), compute local covariance contributions (2000×2000 = 16 MB), sum, eigendecompose, project. Reduces per-GPU memory from 36→6.7 GB. Validated at 3.4M cells. See `_distributed_covariance_pca()` in `benchmark_maxpower.py`.
+
+---
+
+## Memory Optimization Strategy (Step 10) — SOLVED
+
+**Goal**: maximize cells × genes on 8×H100 without sacrificing scientific rigor.
+
+**Previous limit**: ~1.7M cells (PCA OOM on GPU 0: scale + SVD exceeded 80 GB).
+**Final limit**: **10.3M cells** on 8×H100 (2 TB RAM). Bottleneck is CPU RAM (465 GB at 10.3M), not GPU VRAM (49/640 GB = 7.6%).
+
+### Root cause
+`anndata_to_GPU()` + `rsc.pp.scale()` put the entire dense matrix on GPU 0. PCA via SVD needed ~2× the matrix as workspace → GPU 0 exceeded 80 GB. Other 7 GPUs sat idle.
+
+### Solution: Distributed covariance PCA (validated 2026-03-16)
+
+Implemented in `_distributed_covariance_pca()` in `benchmark_maxpower.py`:
+
+1. **Scale on CPU** — `sc.pp.scale()` on 2 TB RAM (trivial)
+2. **Scatter** — split dense matrix into 8 chunks, transfer each to its own GPU (~3.2 GB/GPU)
+3. **Local covariance** — each GPU computes `X_i.T @ X_i` (2000×2000 = 16 MB)
+4. **Sum + eigendecompose** — on GPU 0 (2000×2000 matrix, sub-second)
+5. **Project** — each GPU: `X_i @ eigenvectors` → chunk_rows × 50
+6. **Gather** — PCA coordinates to CPU, store in `adata.obsm["X_pca"]`
+
+**Result at 3.4M cells**: each GPU used 6.6–6.8 GB (vs 36 GB on GPU 0 before). PCA completed in ~2s. 73 GB free per GPU.
+
+Mathematically equivalent to standard PCA (covariance method = `eigh(X.T @ X / (n-1))`).
+
+### Test results
+
+| Test | Cells | Result | GPU peak | Notes |
+|------|-------|--------|----------|-------|
+| RMM 2GB | 2M | PASS | 18.8 GB | PCA only on GPU 0 |
+| RMM 2GB | 3.4M | FAIL | 28.8 GB | PCA SVD still too large |
+| Scatter (cuml.dask) | 3.4M | FAIL | — | Container linking bug |
+| Scatter (covariance) | 3.4M | **PASS** | 6.7 GB | 73 GB free per GPU |
+
+### Lean GPU transfer (validated 2026-03-17)
+
+After PCA, replace `adata.X` (25 GB dense) with empty sparse matrix before `anndata_to_GPU()`. Neighbors only uses `X_pca` (0.6 GB in obsm), not X. Result: GPU 0 drops from ~29 GB to **4.1 GB** for neighbors/leiden/UMAP.
+
+### DE at scale (raw.X = 121 GB sparse)
+
+`adata.raw.X` at 3.4M × 41k genes has 10.8B non-zeros = **121 GB** sparse CSR. Too large for a single GPU (80 GB). Options tested:
+- **GPU DE**: FAIL — 121 GB > 80 GB VRAM
+- **CPU DE**: works but slow (hours at 3.4M cells with 69 clusters)
+
+Strategy: `--skip-de` flag for binary search (DE is not the GPU bottleneck). Run DE separately on the final successful attempt. DE on CPU with `sc.tl.rank_genes_groups(use_raw=True)`.
+
+### Binary search results (validated 2026-03-19)
+
+| Cells | Tempo | RAM | VRAM (total) | Throughput | Status |
+|------:|------:|----:|-------------:|-----------:|--------|
+| 3.4M | 18 min | 155 GB | 49 GB | 3,250/s | PASS |
+| 6.9M | 35 min | 308 GB | 49 GB | 3,255/s | PASS |
+| 10.3M | 73 min | 465 GB | 49 GB | 2,362/s | **PASS (max)** |
+| 12.0M | — | 457+ GB | 29 GB | — | FAIL (leiden OOM, signal 9) |
+| 13.7M | — | 493+ GB | — | — | FAIL (scale OOM, signal 9) |
+
+### Remaining bottlenecks
+- **CPU RAM is the limit**: 465/2048 GB at 10.3M → ~45 GB per million cells. Leiden at 12M pushed past SLURM mem limit.
+- Neighbors on GPU 0: 28.8/80 GB at 12M → still has headroom
+- PCA scatter: 11.2 GB/GPU at 12M → still has headroom
+- GPU VRAM is NOT the bottleneck: flat at 49 GB (7.6%) from 3.4M to 10.3M
+- DE: must run separately (raw.X too large for GPU), see Step 10b
+
+### Capacity limit is cells × genes (manuscript point)
+
+The memory limit is **cells × genes**, not cells alone. With 2000 HVGs (standard), the dense matrix is `n_cells × 2000 × 4B`. More HVGs → fewer cells, and vice versa:
+- 2000 HVGs: estimated ~10M+ cells
+- 5000 HVGs: estimated ~4M cells
+- 1000 HVGs: estimated ~20M cells
+
+This tradeoff MUST be discussed in the manuscript.
+
+**Constraints preserved**: 2000 HVGs, float32, same pipeline steps. All changes are memory layout optimizations → scientifically equivalent results.
+
+---
+
+## DE Benchmark at Scale (Step 10b)
+
+### Problem
+
+`adata.raw.X` at 3.4M cells × 41k genes has 10.8B non-zeros = **121 GB** sparse CSR. This exceeds single-GPU VRAM (80 GB), so GPU DE via `rsc.tl.rank_genes_groups()` fails. CPU Wilcoxon works but takes hours at 3.4M cells with 69 Leiden clusters. We need a faster strategy.
+
+### Factorial Experimental Design
+
+Eight combinations testing three axes: **test type** (Wilcoxon vs t-test vs pseudo-bulk) × **GPU strategy** (none / scatter / chunk-and-stream).
+
+| Test | Method | Backend | GPUs | Description |
+|------|--------|---------|------|-------------|
+| 1 | Wilcoxon | CPU | 0 | Baseline — `sc.tl.rank_genes_groups(method="wilcoxon")` |
+| 2 | t-test | CPU | 0 | `sc.tl.rank_genes_groups(method="t-test")` |
+| 3 | Pseudo-bulk | CPU | 0 | Aggregate by donor×cluster, Wilcoxon on pseudo-bulk matrix |
+| 4 | Wilcoxon | scatter by genes | 8 | Split 41k genes across 8 GPUs (~5k/GPU), run Wilcoxon per GPU |
+| 5 | Wilcoxon | chunk-and-stream | 1 | Load gene chunks to GPU, compute, free, next chunk |
+| 6 | t-test | scatter by genes | 8 | Same gene scatter, but t-test instead of Wilcoxon |
+| 7 | t-test | chunk-and-stream | 1 | Same streaming, but t-test |
+| 8 | t-test | scatter + cleanup | 8 | Test 6 + aggressive memory cleanup between chunks |
+
+### Results (validated 2026-03-20, 3.4M cells × 41k genes × 81 clusters)
+
+| Test | Method | Backend | Time | Speedup vs CPU t-test |
+|------|--------|---------|-----:|----------------------:|
+| ttest_cpu | t-test | CPU | 5,598s (93 min) | 1× (baseline) |
+| **pseudobulk** | Wilcoxon | CPU (aggregated) | **128s (2 min)** | **44×** |
+| **wilcoxon_scatter** | Wilcoxon | 8 GPU | **826s (14 min)** | **6.8×** |
+| wilcoxon_chunk | Wilcoxon | 1 GPU | 831s (14 min) | 6.7× |
+| ttest_scatter | t-test | 8 GPU | 1,656s (28 min) | 3.4× |
+| ttest_chunk | t-test | 1 GPU | 1,650s (28 min) | 3.4× |
+| ttest_scatter_clean | t-test | 8 GPU + cleanup | 1,649s (28 min) | 3.4× |
+
+**Key findings:**
+- Pseudo-bulk is fastest AND statistically most correct (avoids pseudoreplication)
+- Wilcoxon GPU (826s) beats t-test GPU (1,656s) — ranking is faster than mean+var on sparse data
+- Multi-GPU scatter ≈ single-GPU chunk — bottleneck is CSR→dense conversion (I/O), not compute
+- Gene chunk size 500 (not 5000) needed to fit on GPU: 500 × 3.4M × 4B = 6.4 GB per chunk
+
+### Key Implementation Notes
+
+- **Gene chunk size**: 500 genes per chunk (5000 caused OOM: 5000 × 3.4M × 4B = 64 GB > 80 GB VRAM)
+- **T-test validity at large n**: At 3.4M cells the CLT guarantees normality of means. T-test only needs mean + variance (no ranking), so it is ~10× cheaper than Wilcoxon per gene. Scientifically valid at this sample size. However, GPU Wilcoxon is actually faster due to sparse data handling.
+- **Pseudo-bulk**: Aggregate raw counts by (donor_id × cluster), then run DE on the aggregated matrix (~hundreds of samples instead of millions of cells). This is the **statistically correct approach** for multi-donor scRNA-seq — avoids pseudoreplication. Note: clusters with only 1 donor are skipped (8 of 81 clusters in our data).
+- **Scatter by genes**: DE tests are independent per gene. Split 41k genes across 8 GPUs in rounds of 8 chunks. Each GPU gets a dense slice of raw.X for its gene subset + the full cluster labels vector.
+- **Chunk-and-stream**: Load a chunk of genes (e.g., 500) to GPU, compute test statistics, free GPU memory, load next chunk. Fits on a single GPU regardless of total gene count.
+- **CSR → CSC conversion**: `raw.X` is stored as CSR (row-major). Efficient column (gene) slicing requires CSC format. Convert once on CPU before scattering: `raw_csc = adata.raw.X.tocsc()`.
+- **Preprocessed data caching**: CPU preprocessing (load + QC + HVG + PCA + neighbors + leiden) takes ~2h at 3.4M. Cached to `data/de_preprocessed_3400000.h5ad` to avoid repeating for each test.
+- **Script**: `scripts/test_de_benchmark.py`
+
+### Manuscript Discussion Point (IMPORTANT)
+
+The paper MUST discuss the statistical limitations of cell-level DE at scale:
+1. scRNA-seq raw counts follow a negative binomial distribution, not Gaussian
+2. After log-normalization the data is continuous but zero-inflated and skewed
+3. Wilcoxon is distribution-free (robust); t-test relies on CLT (valid at large n)
+4. At 3.4M cells, p-values are meaningless — virtually every gene is "significant". Effect size (logFC) matters more than p-values
+5. Pseudo-bulk with proper count models (DESeq2/edgeR) is the gold standard for multi-donor experiments but requires R and doesn't benefit from GPU acceleration
+6. The benchmark tests standard scanpy methods because they represent current practice, while acknowledging that pseudo-bulk is statistically superior
+
 ---
 
 ## Execution Order
@@ -668,7 +811,8 @@ Follow the **Suggested Step Sequence** in the "Development Rules" section above.
 7. Full-scale CPU benchmarks (all dataset sizes, 5 repeats) ✅ DONE
 8. GPU scaling benchmarks (1/2/4/8 GPUs, all sizes, 5 repeats) ✅ DONE
 9. Analysis and figure generation ✅ DONE (6 figures + summary table)
-10. Max-power stress test (full ~3.6M mouse brain + binary search for DGX limit) 🔄 IN PROGRESS
+10. Max-power stress test ✅ DONE — 10.3M cells max, CPU RAM bottleneck
+10b. DE benchmark at scale ✅ DONE — 7 tests, pseudo-bulk 44× fastest
 11. Manuscript — scRNA-seq sections
 12. Spatial omics benchmark (Visium/HD/Xenium) — see `SPATIAL.md` — **after step 11**
 13. Manuscript — spatial sections + finalize → condense for CIBB 2026
