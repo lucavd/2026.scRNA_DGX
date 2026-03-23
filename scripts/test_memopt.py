@@ -6,11 +6,14 @@ fitting more cells on 8×H100 GPUs. Run ONE test at a time, check output,
 then try the next.
 
 Tests:
-  baseline  — current setup (RMM 10GB pool), for comparison
-  rmm2gb    — reduce RMM pool from 10GB to 2GB
-  cpuscale  — do scale() on CPU, transfer dense matrix to GPU
-  scatter   — pre-scatter data across all 8 GPUs via dask array
-  fullpipe  — full pipeline: scatter PCA + lean transfer + all steps + DE
+  baseline      — current setup (RMM 10GB pool), for comparison
+  rmm2gb        — reduce RMM pool from 10GB to 2GB
+  cpuscale      — do scale() on CPU, transfer dense matrix to GPU
+  scatter       — pre-scatter data across all 8 GPUs via dask array
+  fullpipe      — full pipeline: scatter PCA + lean transfer + all steps + DE
+  sparsescatter — fused scale+scatter: compute mean/std from sparse on CPU,
+                  each GPU densifies+scales its own chunk. Dense matrix NEVER
+                  exists on CPU. Maximum RAM savings.
 
 Usage:
     python scripts/test_memopt.py --data-dir data/ --target-cells 2000000 --test baseline
@@ -98,14 +101,35 @@ def load_and_preprocess(data_dir: str, target_cells: int) -> sc.AnnData:
     log(f"Loaded: {adata.n_obs:,} cells x {adata.n_vars:,} genes ({time.time()-t0:.0f}s)")
     ram_report()
 
-    # Subsample
+    # Subsample or replicate
     if target_cells < adata.n_obs:
         log(f"Subsampling {adata.n_obs:,} -> {target_cells:,} cells...")
         np.random.seed(RANDOM_SEED)
         idx = np.random.choice(adata.n_obs, size=target_cells, replace=False)
         adata = adata[sorted(idx)].copy()
     elif target_cells > adata.n_obs:
-        log(f"WARNING: target {target_cells:,} > available {adata.n_obs:,}, using all cells")
+        import anndata
+        n_orig = adata.n_obs
+        n_full_copies = target_cells // n_orig
+        remainder = target_cells % n_orig
+        log(f"Resizing: {n_orig:,} × {n_full_copies} + {remainder:,} = {target_cells:,} cells...")
+        t0 = time.time()
+        copies = []
+        for i in range(n_full_copies):
+            copy = adata.copy()
+            copy.obs_names = [f"{name}_rep{i}" for name in copy.obs_names]
+            copies.append(copy)
+        if remainder > 0:
+            np.random.seed(RANDOM_SEED)
+            idx = np.random.choice(n_orig, size=remainder, replace=False)
+            partial = adata[sorted(idx)].copy()
+            partial.obs_names = [f"{name}_rep{n_full_copies}" for name in partial.obs_names]
+            copies.append(partial)
+        adata = anndata.concat(copies, join="inner", merge="first")
+        del copies
+        gc.collect()
+        log(f"Done: {adata.n_obs:,} x {adata.n_vars:,} ({time.time()-t0:.0f}s)")
+        ram_report()
 
     # QC
     log("QC filtering...")
@@ -788,6 +812,238 @@ def test_fullpipe(adata: sc.AnnData, n_gpus: int, rmm_pool: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Test 6: sparsescatter (fused scale+scatter — no dense on CPU)
+# ---------------------------------------------------------------------------
+
+def test_sparsescatter(adata: sc.AnnData, n_gpus: int, rmm_pool: str) -> bool:
+    """Fused scale+scatter: dense matrix NEVER exists on CPU.
+
+    Strategy:
+      1. Compute per-gene mean and std from the SPARSE matrix on CPU.
+         This is O(nnz) memory — no dense copy needed.
+      2. Split the sparse matrix by rows (cells) into n_gpus chunks.
+      3. Each GPU receives its sparse chunk, densifies it locally (~3 GB),
+         and applies (X - mean) / std in-place.
+      4. PCA via distributed covariance method (same as scatter test).
+      5. Lean transfer for neighbors/leiden/UMAP.
+
+    CPU RAM never holds the dense matrix. At 13.7M × 2000 genes, this
+    saves ~103 GB of CPU RAM compared to sc.pp.scale().
+
+    Args:
+        adata: Preprocessed AnnData (HVG subset, sparse, on CPU).
+        n_gpus: Number of GPUs.
+        rmm_pool: RMM pool size string.
+
+    Returns:
+        True if all steps completed without OOM.
+    """
+    import cupy as cp
+    import pynvml
+    import scipy.sparse as sp
+
+    pynvml.nvmlInit()
+
+    log(f"{'=' * 60}")
+    log(f"TEST [sparsescatter]: fused scale+scatter, no dense on CPU")
+    log(f"Matrix: {adata.n_obs:,} x {adata.n_vars:,}")
+    log(f"{'=' * 60}")
+
+    # Ensure X is sparse
+    if not sp.issparse(adata.X):
+        log("WARNING: adata.X is already dense — converting to sparse for test")
+        adata.X = sp.csr_matrix(adata.X)
+
+    X_sparse = adata.X  # CSR sparse on CPU
+    n_cells, n_genes = X_sparse.shape
+    log(f"  Sparse X: nnz={X_sparse.nnz:,}, density={X_sparse.nnz/(n_cells*n_genes):.4f}")
+    sparse_gb = (X_sparse.data.nbytes + X_sparse.indices.nbytes + X_sparse.indptr.nbytes) / (1024**3)
+    log(f"  Sparse size: {sparse_gb:.1f} GB")
+    ram_report()
+
+    # Step 1: Compute mean and std per gene from sparse (no dense copy!)
+    log("--- Step 1: Compute mean/std from sparse (no dense copy) ---")
+    t0 = time.time()
+    # mean = sum(X) / n_cells (works on sparse)
+    gene_mean = np.asarray(X_sparse.mean(axis=0)).ravel().astype(np.float32)
+    # var = E[X²] - (E[X])²
+    # X_sparse.power(2) stays sparse (only squares non-zeros)
+    gene_sq_mean = np.asarray(X_sparse.power(2).mean(axis=0)).ravel().astype(np.float32)
+    gene_var = gene_sq_mean - gene_mean ** 2
+    # Clip variance to avoid div by zero, take sqrt
+    gene_std = np.sqrt(np.maximum(gene_var, 1e-12)).astype(np.float32)
+    log(f"  Mean/std computed in {time.time()-t0:.1f}s (no dense copy created)")
+    log(f"  Mean range: [{gene_mean.min():.4f}, {gene_mean.max():.4f}]")
+    log(f"  Std range: [{gene_std.min():.4f}, {gene_std.max():.4f}]")
+    ram_report()
+
+    # Step 2: Split sparse matrix by rows into chunks
+    log(f"--- Step 2: Split sparse into {n_gpus} row chunks ---")
+    chunk_size = n_cells // n_gpus
+    remainder = n_cells % n_gpus
+    chunk_bounds = []
+    offset = 0
+    for i in range(n_gpus):
+        end = offset + chunk_size + (1 if i < remainder else 0)
+        chunk_bounds.append((offset, end))
+        offset = end
+    chunk_rows = [end - start for start, end in chunk_bounds]
+    chunk_dense_gb = chunk_rows[0] * n_genes * 4 / (1024**3)
+    log(f"  Chunks: {chunk_rows} rows")
+    log(f"  Per-chunk dense: {chunk_dense_gb:.2f} GB (exists ONLY on GPU)")
+    ram_report()
+
+    # Start Dask (for RMM pools)
+    cluster, client = _start_dask(n_gpus, rmm_pool)
+    vram_report(n_gpus)
+
+    try:
+        # Step 3: Transfer each chunk to GPU, densify, scale — one at a time
+        log(f"--- Step 3: Transfer+densify+scale on each GPU ---")
+        t0 = time.time()
+        gpu_mean = None  # lazy: create on first GPU, copy to others
+        gpu_std = None
+        gpu_chunks = []
+
+        for i, (start, end) in enumerate(chunk_bounds):
+            with cp.cuda.Device(i):
+                # Slice sparse rows (CSR row slicing is efficient)
+                chunk_sparse = X_sparse[start:end]
+                # Densify on GPU
+                chunk_gpu = cp.array(chunk_sparse.toarray(), dtype=cp.float32)
+                # Scale: (X - mean) / std, clip at max_value=10
+                if gpu_mean is None:
+                    gpu_mean = cp.asarray(gene_mean)
+                    gpu_std = cp.asarray(gene_std)
+                mean_i = cp.asarray(gpu_mean) if i != 0 else gpu_mean
+                std_i = cp.asarray(gpu_std) if i != 0 else gpu_std
+                chunk_gpu -= mean_i
+                chunk_gpu /= std_i
+                # Clip (same as sc.pp.scale max_value=10)
+                cp.clip(chunk_gpu, -10, 10, out=chunk_gpu)
+                gpu_chunks.append(chunk_gpu)
+
+        cp.cuda.Stream.null.synchronize()
+        log(f"  All chunks transferred+scaled in {time.time()-t0:.1f}s")
+        vram_report(n_gpus)
+        ram_report()
+
+        # === DISTRIBUTED PCA: COVARIANCE METHOD ===
+        n_comps = 50
+
+        # Step 4: Local covariance on each GPU
+        log(f"--- Step 4: Local covariance (X_i.T @ X_i) on {n_gpus} GPUs ---")
+        t0 = time.time()
+        local_covs = []
+        for i, X_i in enumerate(gpu_chunks):
+            with cp.cuda.Device(i):
+                cov_i = X_i.T @ X_i
+                local_covs.append(cov_i)
+        cp.cuda.Stream.null.synchronize()
+        log(f"  Local covariances in {time.time()-t0:.1f}s")
+        vram_report(n_gpus)
+
+        # Step 5: Sum covariances on GPU 0
+        log("--- Step 5: Sum + eigendecomposition ---")
+        t0 = time.time()
+        with cp.cuda.Device(0):
+            cov_total = cp.zeros((n_genes, n_genes), dtype=cp.float32)
+            for i, cov_i in enumerate(local_covs):
+                cov_total += cp.asarray(cov_i) if i != 0 else cov_i
+            cov_total /= (n_cells - 1)
+            eigenvalues, eigenvectors = cp.linalg.eigh(cov_total)
+            eigenvalues = cp.ascontiguousarray(eigenvalues[::-1][:n_comps])
+            eigenvectors = cp.ascontiguousarray(eigenvectors[:, ::-1][:, :n_comps])
+            total_var = float(cp.trace(cov_total))
+            explained_var = eigenvalues / total_var
+        cp.cuda.Stream.null.synchronize()
+        del local_covs, cov_total
+        log(f"  Eigen done in {time.time()-t0:.1f}s")
+        log(f"  Explained variance (50 PCs): {float(explained_var.sum()):.4f}")
+        vram_report(n_gpus)
+
+        # Step 6: Project each chunk
+        log(f"--- Step 6: Projection on {n_gpus} GPUs ---")
+        t0 = time.time()
+        pca_chunks = []
+        for i, X_i in enumerate(gpu_chunks):
+            with cp.cuda.Device(i):
+                V_i = cp.asarray(eigenvectors) if i != 0 else eigenvectors
+                pca_chunks.append(X_i @ V_i)
+        cp.cuda.Stream.null.synchronize()
+        log(f"  Projection done in {time.time()-t0:.1f}s")
+
+        # Gather PCA to CPU
+        log("--- Gathering PCA to CPU ---")
+        pca_cpu = []
+        for i, pca_i in enumerate(pca_chunks):
+            with cp.cuda.Device(i):
+                pca_cpu.append(cp.asnumpy(pca_i))
+        X_pca = np.vstack(pca_cpu)
+        del pca_chunks, pca_cpu
+        log(f"  PCA: {X_pca.shape}, {X_pca.nbytes/(1024**2):.1f} MB")
+
+        # Free GPU chunks
+        del gpu_chunks
+        for i in range(n_gpus):
+            with cp.cuda.Device(i):
+                cp.get_default_memory_pool().free_all_blocks()
+        gc.collect()
+        vram_report(n_gpus)
+        ram_report()
+
+        # Store PCA
+        adata.obsm["X_pca"] = X_pca
+        adata.uns["pca"] = {
+            "variance": cp.asnumpy(eigenvalues),
+            "variance_ratio": cp.asnumpy(explained_var),
+        }
+
+        # Lean transfer + neighbors
+        log("--- Lean transfer + Neighbors ---")
+        import rapids_singlecell as rsc
+
+        adata.X = sp.csr_matrix((adata.n_obs, adata.n_vars), dtype=np.float32)
+        rsc.get.anndata_to_GPU(adata)
+        t0 = time.time()
+        rsc.pp.neighbors(adata, n_neighbors=15, n_pcs=50, random_state=RANDOM_SEED)
+        cp.cuda.Stream.null.synchronize()
+        log(f"  Neighbors done in {time.time()-t0:.1f}s")
+        vram_report(n_gpus)
+
+        # Leiden
+        log("--- Leiden ---")
+        t0 = time.time()
+        rsc.tl.leiden(adata, resolution=1.0, random_state=RANDOM_SEED, key_added="leiden_1.0")
+        cp.cuda.Stream.null.synchronize()
+        log(f"  Leiden done in {time.time()-t0:.1f}s")
+        vram_report(n_gpus)
+
+        # UMAP
+        log("--- UMAP ---")
+        t0 = time.time()
+        rsc.tl.umap(adata, random_state=RANDOM_SEED)
+        cp.cuda.Stream.null.synchronize()
+        log(f"  UMAP done in {time.time()-t0:.1f}s")
+        vram_report(n_gpus)
+
+        log(f"SUCCESS [sparsescatter] — full pipeline, no dense on CPU")
+        ram_report()
+        return True
+
+    except Exception as e:
+        log(f"FAILED [sparsescatter]: {type(e).__name__}: {e}")
+        import traceback
+        traceback.print_exc()
+        vram_report(n_gpus)
+        return False
+
+    finally:
+        _stop_dask(cluster, client)
+        pynvml.nvmlShutdown()
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -825,7 +1081,7 @@ Examples:
     )
     parser.add_argument(
         "--test", type=str, required=True,
-        choices=["baseline", "rmm2gb", "cpuscale", "scatter", "fullpipe"],
+        choices=["baseline", "rmm2gb", "cpuscale", "scatter", "fullpipe", "sparsescatter"],
         help="Which optimization test to run",
     )
     return parser.parse_args()
@@ -858,6 +1114,8 @@ def main() -> None:
         success = test_scatter(adata, args.n_gpus, "2GB")
     elif args.test == "fullpipe":
         success = test_fullpipe(adata, args.n_gpus, "2GB")
+    elif args.test == "sparsescatter":
+        success = test_sparsescatter(adata, args.n_gpus, "2GB")
     else:
         log(f"Unknown test: {args.test}")
         sys.exit(1)

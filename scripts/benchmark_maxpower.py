@@ -526,6 +526,7 @@ def resize_dataset(adata: sc.AnnData, target_cells: int) -> sc.AnnData:
 
 def run_pipeline(
     adata_path: Path, n_gpus: int, target_cells: int = 0, skip_de: bool = False,
+    clustering: str = "leiden",
 ) -> tuple:
     """Run the full hybrid CPU+GPU pipeline on all available GPUs.
 
@@ -676,26 +677,59 @@ def run_pipeline(
     cp.get_default_memory_pool().free_all_blocks()
     rmm.reinitialize(pool_allocator=True, devices=0)
 
-    # Single-GPU steps
+    # Single-GPU steps: clustering
     cluster_results = {}
-    for res in LEIDEN_RESOLUTIONS:
-        key = f"leiden_{res}"
-        time_step(
-            key,
-            lambda r=res: rsc.tl.leiden(
-                adata, resolution=r, random_state=RANDOM_SEED, key_added=f"leiden_{r}",
-            ),
-            timings, memory, n_gpus,
-        )
-        labels = adata.obs[f"leiden_{res}"].values
-        if hasattr(labels, "get"):
-            labels = labels.get()
-        n_clusters = len(np.unique(np.asarray(labels)))
-        cluster_results[key] = {
-            "n_clusters": n_clusters,
-            "labels_hash": sha256_of_array(np.asarray(labels, dtype=str)),
-        }
-        print(f"    {key}: {n_clusters} clusters")
+    if clustering == "kmeans":
+        # GPU-native KMeans via cuML — scales beyond leiden's memory limit
+        from cuml import KMeans as cuKMeans
+
+        # Map leiden resolutions to approximate k values
+        # (more resolution → more clusters)
+        kmeans_k_map = {0.5: 50, 1.0: 100, 1.5: 200}
+        for res in LEIDEN_RESOLUTIONS:
+            k = kmeans_k_map[res]
+            key = f"kmeans_{res}"
+
+            def _run_kmeans(n_clusters=k, r=res):
+                km = cuKMeans(n_clusters=n_clusters, random_state=RANDOM_SEED, max_iter=300)
+                X_pca = adata.obsm["X_pca"]
+                if not hasattr(X_pca, "__cuda_array_interface__"):
+                    X_pca = cp.asarray(X_pca)
+                labels = km.fit_predict(X_pca)
+                if hasattr(labels, "get"):
+                    labels = labels.get()
+                adata.obs[f"kmeans_{r}"] = labels.astype(str)
+
+            time_step(key, _run_kmeans, timings, memory, n_gpus)
+            labels = adata.obs[f"kmeans_{res}"].values
+            if hasattr(labels, "get"):
+                labels = labels.get()
+            n_clusters = len(np.unique(np.asarray(labels)))
+            cluster_results[key] = {
+                "n_clusters": n_clusters,
+                "labels_hash": sha256_of_array(np.asarray(labels, dtype=str)),
+            }
+            print(f"    {key}: {n_clusters} clusters (k={kmeans_k_map[res]})")
+    else:
+        # Default: Leiden via cugraph (GPU) — OOMs above ~12M cells
+        for res in LEIDEN_RESOLUTIONS:
+            key = f"leiden_{res}"
+            time_step(
+                key,
+                lambda r=res: rsc.tl.leiden(
+                    adata, resolution=r, random_state=RANDOM_SEED, key_added=f"leiden_{r}",
+                ),
+                timings, memory, n_gpus,
+            )
+            labels = adata.obs[f"leiden_{res}"].values
+            if hasattr(labels, "get"):
+                labels = labels.get()
+            n_clusters = len(np.unique(np.asarray(labels)))
+            cluster_results[key] = {
+                "n_clusters": n_clusters,
+                "labels_hash": sha256_of_array(np.asarray(labels, dtype=str)),
+            }
+            print(f"    {key}: {n_clusters} clusters")
 
     time_step(
         "umap",
@@ -768,7 +802,8 @@ def run_pipeline(
             "configuration": {
                 "dask_cluster": dask_setup_info,
                 "gpu_warmup": True,
-                "leiden_backend": "cugraph",
+                "clustering_algorithm": clustering,
+                "leiden_backend": "cugraph" if clustering == "leiden" else None,
                 "cpu_steps": [
                     "data_loading", "qc_filtering", "normalization",
                     "hvg_selection", "scale",
@@ -793,10 +828,10 @@ def run_pipeline(
             "n_genes_after_qc": n_genes_after_qc,
             "n_hvgs": n_hvgs,
             "hvg_list_hash": hvg_hash,
-            **{f"n_clusters_{res}": cluster_results[f"leiden_{res}"]["n_clusters"]
-               for res in LEIDEN_RESOLUTIONS},
-            **{f"cluster_labels_hash_{res}": cluster_results[f"leiden_{res}"]["labels_hash"]
-               for res in LEIDEN_RESOLUTIONS},
+            **{f"n_clusters_{res}": list(cluster_results.values())[i]["n_clusters"]
+               for i, res in enumerate(LEIDEN_RESOLUTIONS)},
+            **{f"cluster_labels_hash_{res}": list(cluster_results.values())[i]["labels_hash"]
+               for i, res in enumerate(LEIDEN_RESOLUTIONS)},
         },
         "resource_utilization": {
             "ram_used_gb": round(peak_ram, 1),
@@ -865,6 +900,10 @@ Examples:
         "--skip-de", action="store_true",
         help="Skip differential expression (for binary search — DE is slow on CPU at >3M cells)",
     )
+    parser.add_argument(
+        "--clustering", type=str, default="leiden", choices=["leiden", "kmeans"],
+        help="Clustering algorithm: leiden (default, OOM at >12M) or kmeans (GPU-native, scalable)",
+    )
     return parser.parse_args()
 
 
@@ -896,7 +935,7 @@ def main() -> None:
         # In find-limit mode the parent process must NOT touch GPUs at all.
         # Each attempt runs in a clean subprocess with its own CUDA context.
         print(f"\nSystem RAM: {psutil.virtual_memory().total / (1024**3):.0f} GB")
-        run_find_limit(adata_path, n_gpus, output_dir, args.fine_low, args.fine_high)
+        run_find_limit(adata_path, n_gpus, output_dir, args.fine_low, args.fine_high, args.clustering)
     else:
         # Single-run mode: initialize GPU and run directly
         init_nvml()
@@ -911,7 +950,7 @@ def main() -> None:
 
             sc.settings.verbosity = 0
 
-            result = run_single(adata_path, n_gpus, args.target_cells, output_dir, args.skip_de)
+            result = run_single(adata_path, n_gpus, args.target_cells, output_dir, args.skip_de, args.clustering)
             if result is None:
                 raise SystemExit(OOM_EXIT_CODE)
         except RuntimeError as e:
@@ -936,7 +975,7 @@ def main() -> None:
 
 def run_single(
     adata_path: Path, n_gpus: int, target_cells: int, output_dir: Path,
-    skip_de: bool = False,
+    skip_de: bool = False, clustering: str = "leiden",
 ) -> dict | None:
     """Run a single benchmark and save results.
 
@@ -944,7 +983,7 @@ def run_single(
         Result dict if successful, None if OOM.
     """
     try:
-        result, adata, hvg_list = run_pipeline(adata_path, n_gpus, target_cells, skip_de)
+        result, adata, hvg_list = run_pipeline(adata_path, n_gpus, target_cells, skip_de, clustering)
     except (MemoryError, cp.cuda.memory.OutOfMemoryError) as e:
         print(f"\n  OOM ERROR at {target_cells:,} cells: {e}")
         gc.collect()
@@ -986,7 +1025,9 @@ def run_single(
     print(f"  RAM used:         {r['ram_used_gb']:.0f} / {r['ram_total_gb']} GB ({r['ram_pct']:.1f}%)")
     print(f"  VRAM used:        {r['vram_used_gb']:.0f} / {r['vram_total_gb']} GB ({r['vram_pct']:.1f}%)")
     print(f"  Throughput:       {result['results_summary']['n_cells_after_qc'] / t['total']:,.0f} cells/second")
-    print(f"  Clusters found:   {result['results_summary']['n_clusters_1.0']} (leiden res=1.0)")
+    clust_key = "n_clusters_1.0"
+    clust_algo = clustering
+    print(f"  Clusters found:   {result['results_summary'][clust_key]} ({clust_algo} res=1.0)")
 
     del adata, hvg_list
     gc.collect()
@@ -1001,6 +1042,7 @@ def _run_in_subprocess(
     output_dir: str,
     n_gpus: int,
     target_cells: int,
+    clustering: str = "leiden",
 ) -> bool:
     """Run a single benchmark attempt in an isolated subprocess.
 
@@ -1026,6 +1068,7 @@ def _run_in_subprocess(
         "--n-gpus", str(n_gpus),
         "--target-cells", str(target_cells),
         "--skip-de",  # DE is too slow for binary search; run separately
+        "--clustering", clustering,
     ]
 
     print(f"  Launching subprocess: target={target_cells:,} cells, {n_gpus} GPUs")
@@ -1048,7 +1091,7 @@ def _run_in_subprocess(
 
 def run_find_limit(
     adata_path: Path, n_gpus: int, output_dir: Path,
-    fine_low: int = 0, fine_high: int = 0,
+    fine_low: int = 0, fine_high: int = 0, clustering: str = "leiden",
 ) -> None:
     """Binary search for the maximum number of cells before OOM.
 
@@ -1084,7 +1127,7 @@ def run_find_limit(
         # Phase 1: coarse search — big jumps to find the crash zone
         coarse_targets = [n_source]
         step = n_source
-        while coarse_targets[-1] + step <= 20_000_000:
+        while coarse_targets[-1] + step <= 50_000_000:
             coarse_targets.append(coarse_targets[-1] + step)
 
         print(f"\n--- Phase 1: Coarse search (step ~{n_source:,}) ---")
@@ -1092,7 +1135,7 @@ def run_find_limit(
             print(f"\n>>> Trying {target:,} cells...")
             success = _run_in_subprocess(
                 script_path, str(adata_path.parent), str(output_dir),
-                n_gpus, target,
+                n_gpus, target, clustering,
             )
             if success:
                 last_success = target
@@ -1120,7 +1163,7 @@ def run_find_limit(
         print(f"\n>>> Binary search: trying {mid:,} cells (range: {low:,}–{high:,})...")
         success = _run_in_subprocess(
             script_path, str(adata_path.parent), str(output_dir),
-            n_gpus, mid,
+            n_gpus, mid, clustering,
         )
         if success:
             low = mid
@@ -1134,6 +1177,7 @@ def run_find_limit(
     print(f"{'=' * 80}")
     print(f"  Maximum cells:  {low:,}")
     print(f"  First OOM at:   {high:,}")
+    print(f"  Clustering:     {clustering}")
     print(f"  Configuration:  {n_gpus}× NVIDIA H100 80GB, ~1800 GB RAM")
     print(f"  Source dataset: {n_source:,} cells (replicated to reach limit)")
     print(f"  PCA method:     covariance_distributed (scatter across {n_gpus} GPUs)")
@@ -1143,12 +1187,14 @@ def run_find_limit(
         "max_cells": low,
         "first_oom_at": high,
         "n_gpus": n_gpus,
+        "clustering": clustering,
         "source_cells": n_source,
         "pca_method": "covariance_distributed",
         "rmm_pool_size": DASK_RMM_POOL_SIZE,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
-    summary_path = output_dir / f"maxpower_limit_{n_gpus}gpu.json"
+    suffix = f"_{clustering}" if clustering != "leiden" else ""
+    summary_path = output_dir / f"maxpower_limit_{n_gpus}gpu{suffix}.json"
     with open(summary_path, "w") as f:
         json.dump(summary, f, indent=2)
     print(f"  Summary saved:  {summary_path}")

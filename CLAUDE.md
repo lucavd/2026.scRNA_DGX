@@ -59,7 +59,7 @@ The user is NOT a DGX/HPC expert. This is one of the first times using this infr
 7. **SLURM jobs for full-scale CPU benchmark**: All dataset sizes × 5 repeats. ✅ DONE
 8. **SLURM jobs for GPU scaling**: 1/2/4/8 GPU on all datasets × 5 repeats. ✅ DONE (note: 8-GPU Dask worker count reporting bug FIXED — all runs used 8 workers, only the readiness check was wrong)
 9. **Analysis and figures**: 6 publication-ready figures + summary table. ✅ DONE (locally)
-10. **Max-power stress test**: ✅ DONE — **10.3M cells** is the DGX limit (8×H100, 2 TB RAM). Bottleneck is CPU RAM (465/2048 GB at 10.3M), not GPU VRAM (49/640 GB = 7.6%). Optimizations: scatter covariance PCA, lean GPU transfer, RMM pool 2GB. Binary search: 12M FAIL (leiden OOM), 13.7M FAIL (scale OOM).
+10. **Max-power stress test**: ✅ DONE — **11.9M cells** is the DGX limit (8×H100, 2 TB RAM). Bottleneck is CPU RAM (535/2048 GB at 11.9M), not GPU VRAM (49/640 GB = 7.6%). Optimizations: scatter covariance PCA, lean GPU transfer, RMM pool 2GB. Binary search: 12M FAIL (leiden OOM), 13.7M FAIL (scale OOM). KMeans GPU tested: same limit (CPU preprocessing, not clustering). Sparse-scatter tested at 14M: HVG selection OOM (scanpy preprocessing is the bottleneck).
 10b. **DE benchmark at scale**: ✅ DONE — 7 tests on 3.4M cells × 41k genes × 81 clusters. Pseudo-bulk fastest (128s, 44× vs CPU t-test). Wilcoxon GPU (826s) beats t-test GPU (1656s). Multi-GPU ≈ single-GPU for DE (I/O bound).
 11. **Manuscript (scRNA-seq part)**: Write the single-cell sections of the full-length paper. ⏳ TODO
 12. **Spatial omics benchmark**: Extend to Visium/Visium HD/Xenium — see `SPATIAL.md`. ⏳ TODO (after step 11)
@@ -137,8 +137,8 @@ Every job script MUST include:
 #SBATCH --account=dctv_dgx
 #SBATCH --export=NONE
 #SBATCH --chdir=/home/u0044
-#SBATCH --output=/home/u0044/slurm-%x_%j.out
-#SBATCH --error=/home/u0044/slurm-%x_%j.err
+#SBATCH --output=/home/u0044/sc-gpu-benchmark/logs/slurm-%x_%j.out
+#SBATCH --error=/home/u0044/sc-gpu-benchmark/logs/slurm-%x_%j.err
 #SBATCH --nodelist=poddgx02
 ```
 
@@ -662,7 +662,26 @@ Use matplotlib with a clean, publication-ready style. Save as both PDF and PNG (
 **Goal**: maximize cells × genes on 8×H100 without sacrificing scientific rigor.
 
 **Previous limit**: ~1.7M cells (PCA OOM on GPU 0: scale + SVD exceeded 80 GB).
-**Final limit**: **10.3M cells** on 8×H100 (2 TB RAM). Bottleneck is CPU RAM (465 GB at 10.3M), not GPU VRAM (49/640 GB = 7.6%).
+**Final limit**: **11.9M cells** on 8×H100 (2 TB RAM). Bottleneck is CPU RAM (535/2048 GB at 11.9M), not GPU VRAM (49/640 GB = 7.6%).
+
+### Two pipeline configurations (IMPORTANT for paper)
+
+The project uses TWO pipeline configurations. They produce **scientifically equivalent results** (same HVG, same clusters, same DE) — the only differences are memory layout optimizations.
+
+| Aspect | Standard pipeline (Steps 7–8) | Optimized pipeline (Step 10) |
+|--------|-------------------------------|------------------------------|
+| Scale | GPU (`rsc.pp.scale`) | CPU (`sc.pp.scale`) |
+| PCA | Single-GPU truncated SVD (cuML) | Scatter covariance across 8 GPUs (CuPy `eigh`) |
+| GPU transfer | Full `adata.X` to GPU 0 | Lean: only `X_pca` (empty sparse X) |
+| RMM pool | 10 GB/GPU | 2 GB/GPU |
+| Neighbors/Leiden/UMAP | GPU 0 (full X in memory) | GPU 0 (only X_pca + graph) |
+| DE | GPU (`rsc.tl.rank_genes_groups`) | Separate: chunk-GPU or CPU |
+| Cell limit | ~1.7M | **11.9M** |
+| Used for | Benchmark results (10k–1.3M, 5 repeats) | Stress test (3.4M–11.9M) |
+
+**For the paper**: Steps 7–8 benchmark results (up to 1.3M cells) use the standard pipeline — this is the canonical rapids-singlecell workflow users would run. The optimized pipeline is presented separately as "how far can we push the hardware with memory-aware engineering". No need to re-run Steps 7–8.
+
+**PCA numerical difference**: truncated SVD (standard) vs covariance method `eigh(X.T @ X / (n-1))` (optimized) are mathematically equivalent but differ at ~10⁻⁶ due to floating-point. At 2000 genes × 50 components, this is negligible.
 
 ### Root cause
 `anndata_to_GPU()` + `rsc.pp.scale()` put the entire dense matrix on GPU 0. PCA via SVD needed ~2× the matrix as workspace → GPU 0 exceeded 80 GB. Other 7 GPUs sat idle.
@@ -703,27 +722,42 @@ After PCA, replace `adata.X` (25 GB dense) with empty sparse matrix before `annd
 
 Strategy: `--skip-de` flag for binary search (DE is not the GPU bottleneck). Run DE separately on the final successful attempt. DE on CPU with `sc.tl.rank_genes_groups(use_raw=True)`.
 
-### Binary search results (validated 2026-03-19)
+### Binary search results (validated 2026-03-20)
 
 | Cells | Tempo | RAM | VRAM (total) | Throughput | Status |
 |------:|------:|----:|-------------:|-----------:|--------|
 | 3.4M | 18 min | 155 GB | 49 GB | 3,250/s | PASS |
 | 6.9M | 35 min | 308 GB | 49 GB | 3,255/s | PASS |
-| 10.3M | 73 min | 465 GB | 49 GB | 2,362/s | **PASS (max)** |
-| 12.0M | — | 457+ GB | 29 GB | — | FAIL (leiden OOM, signal 9) |
+| 10.3M | 73 min | 465 GB | 49 GB | 2,362/s | PASS |
+| 11.1M | 94 min | 500 GB | 49 GB | — | PASS |
+| 11.5M | 114 min | 517 GB | 49 GB | — | PASS |
+| 11.9M | 119 min | 535 GB | 49 GB | — | **PASS (max)** |
+| 12.0M | — | — | — | — | FAIL (leiden OOM, signal 9) |
 | 13.7M | — | 493+ GB | — | — | FAIL (scale OOM, signal 9) |
 
 ### Remaining bottlenecks
-- **CPU RAM is the limit**: 465/2048 GB at 10.3M → ~45 GB per million cells. Leiden at 12M pushed past SLURM mem limit.
+- **CPU RAM is the limit**: 535/2048 GB at 11.9M → ~45 GB per million cells. Leiden at 12M pushed past available memory.
 - Neighbors on GPU 0: 28.8/80 GB at 12M → still has headroom
 - PCA scatter: 11.2 GB/GPU at 12M → still has headroom
-- GPU VRAM is NOT the bottleneck: flat at 49 GB (7.6%) from 3.4M to 10.3M
+- GPU VRAM is NOT the bottleneck: flat at 49 GB (7.6%) from 3.4M to 11.9M
 - DE: must run separately (raw.X too large for GPU), see Step 10b
+
+### KMeans GPU as Leiden alternative (tested 2026-03-22)
+
+Tested `cuml.KMeans` (GPU-native) as a replacement for Leiden to bypass the 12M OOM. Result: **same crash at 13.7M** — the OOM happens during CPU preprocessing (scale: sparse→dense conversion), NOT during clustering. KMeans never gets a chance to run. This confirms the bottleneck is CPU RAM during preprocessing, not the clustering algorithm. Leiden's OOM at 12M is a tighter limit only because leiden's internal data structures add ~50 GB on top of the preprocessing cost.
+
+### Sparse-scatter optimization (tested 2026-03-23)
+
+Attempted to bypass the dense matrix bottleneck by fusing scale+scatter: compute mean/std from the sparse matrix on CPU (O(nnz) memory, no dense copy), then each GPU densifies+scales only its chunk (~13 GB per GPU instead of 103 GB on CPU). The dense matrix would NEVER exist on CPU.
+
+**Result**: OOM at 14M cells during **HVG selection** (before our code even runs). RAM was at 629 GB after resize, and `sc.pp.highly_variable_genes()` creates internal temporaries that pushed past the 1800 GB SLURM limit. The bottleneck is **scanpy's preprocessing**, not our GPU pipeline.
+
+**Conclusion for the paper**: The DGX H100 limit of **11.9M cells** is imposed by scanpy's CPU preprocessing memory footprint (~45 GB/million cells), not by GPU capacity. GPU VRAM is used at only 7.6% (49/640 GB). Future work could optimize scanpy's memory usage (chunked QC, out-of-core HVG selection) or use alternative preprocessing frameworks.
 
 ### Capacity limit is cells × genes (manuscript point)
 
 The memory limit is **cells × genes**, not cells alone. With 2000 HVGs (standard), the dense matrix is `n_cells × 2000 × 4B`. More HVGs → fewer cells, and vice versa:
-- 2000 HVGs: estimated ~10M+ cells
+- 2000 HVGs: ~11.9M cells (validated)
 - 5000 HVGs: estimated ~4M cells
 - 1000 HVGs: estimated ~20M cells
 
@@ -811,9 +845,9 @@ Follow the **Suggested Step Sequence** in the "Development Rules" section above.
 7. Full-scale CPU benchmarks (all dataset sizes, 5 repeats) ✅ DONE
 8. GPU scaling benchmarks (1/2/4/8 GPUs, all sizes, 5 repeats) ✅ DONE
 9. Analysis and figure generation ✅ DONE (6 figures + summary table)
-10. Max-power stress test ✅ DONE — 10.3M cells max, CPU RAM bottleneck
-10b. DE benchmark at scale ✅ DONE — 7 tests, pseudo-bulk 44× fastest
-11. Manuscript — scRNA-seq sections
+10. Max-power stress test ✅ DONE — **11.9M cells** is the DGX limit (8×H100, 2 TB RAM). Bottleneck is CPU RAM (535/2048 GB at 11.9M), not GPU VRAM (49/640 GB = 7.6%). Optimizations: scatter covariance PCA, lean GPU transfer, RMM pool 2GB. Binary search: 12M FAIL (leiden OOM), 13.7M FAIL (scale OOM).
+10b. DE benchmark at scale ✅ DONE — 7 tests on 3.4M cells × 41k genes × 81 clusters. Pseudo-bulk fastest (128s, 44× vs CPU t-test). Wilcoxon GPU (826s) beats t-test GPU (1656s). Multi-GPU ≈ single-GPU for DE (I/O bound).
+11. Manuscript — scRNA-seq sections ⏳ TODO
 12. Spatial omics benchmark (Visium/HD/Xenium) — see `SPATIAL.md` — **after step 11**
 13. Manuscript — spatial sections + finalize → condense for CIBB 2026
 

@@ -2,8 +2,8 @@
 #SBATCH --job-name=maxpower_8gpu
 #SBATCH --partition=dgx12cluster
 #SBATCH --account=dctv_dgx
-#SBATCH --output=/home/u0044/slurm-%x_%j.out
-#SBATCH --error=/home/u0044/slurm-%x_%j.err
+#SBATCH --output=/home/u0044/sc-gpu-benchmark/logs/slurm-%x_%j.out
+#SBATCH --error=/home/u0044/sc-gpu-benchmark/logs/slurm-%x_%j.err
 #SBATCH --export=NONE
 #SBATCH --chdir=/home/u0044
 #SBATCH --mail-user=luca.vedovelli@unipd.it
@@ -77,11 +77,16 @@ if [ -n "${FINE_LOW}" ] && [ -n "${FINE_HIGH}" ]; then
     echo "Fine search bounds: ${FINE_LOW} — ${FINE_HIGH}"
 fi
 
+# Support --clustering (default: leiden, alternative: kmeans)
+CLUSTERING=${CLUSTERING:-leiden}
+echo "Clustering: ${CLUSTERING}"
+
 # Run find-limit mode: binary search for max cells
 run_in_container "${CONTAINER_PYTHON}" -u "${WORKDIR}/scripts/benchmark_maxpower.py" \
     --data-dir "${WORKDIR}/data" \
     --output-dir "${WORKDIR}/results" \
     --n-gpus 8 \
+    --clustering "${CLUSTERING}" \
     "${FIND_LIMIT_ARGS[@]}"
 
 echo ""

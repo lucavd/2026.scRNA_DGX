@@ -2,8 +2,8 @@
 #SBATCH --job-name=gpu_bench_1
 #SBATCH --partition=dgx12cluster
 #SBATCH --account=dctv_dgx
-#SBATCH --output=/home/u0044/slurm-%x_%j.out
-#SBATCH --error=/home/u0044/slurm-%x_%j.err
+#SBATCH --output=/home/u0044/sc-gpu-benchmark/logs/slurm-%x_%j.out
+#SBATCH --error=/home/u0044/sc-gpu-benchmark/logs/slurm-%x_%j.err
 #SBATCH --export=NONE
 #SBATCH --chdir=/home/u0044
 #SBATCH --mail-user=luca.vedovelli@unipd.it
