@@ -845,7 +845,7 @@ Follow the **Suggested Step Sequence** in the "Development Rules" section above.
 7. Full-scale CPU benchmarks (all dataset sizes, 5 repeats) ✅ DONE
 8. GPU scaling benchmarks (1/2/4/8 GPUs, all sizes, 5 repeats) ✅ DONE
 9. Analysis and figure generation ✅ DONE (6 figures + summary table)
-10. Max-power stress test ✅ DONE — **11.9M cells** is the DGX limit (8×H100, 2 TB RAM). Bottleneck is CPU RAM (535/2048 GB at 11.9M), not GPU VRAM (49/640 GB = 7.6%). Optimizations: scatter covariance PCA, lean GPU transfer, RMM pool 2GB. Binary search: 12M FAIL (leiden OOM), 13.7M FAIL (scale OOM).
+10. Max-power stress test ✅ DONE — **11.9M cells** is the DGX limit (8×H100, 2 TB RAM). Bottleneck is CPU RAM (535/2048 GB at 11.9M), not GPU VRAM (49/640 GB = 7.6%). Optimizations: scatter covariance PCA, lean GPU transfer, RMM pool 2GB. Binary search: 12M FAIL (leiden OOM), 13.7M FAIL (scale OOM). KMeans GPU tested: same limit (CPU preprocessing, not clustering). Sparse-scatter tested at 14M: HVG selection OOM (scanpy preprocessing is the bottleneck).
 10b. DE benchmark at scale ✅ DONE — 7 tests on 3.4M cells × 41k genes × 81 clusters. Pseudo-bulk fastest (128s, 44× vs CPU t-test). Wilcoxon GPU (826s) beats t-test GPU (1656s). Multi-GPU ≈ single-GPU for DE (I/O bound).
 11. Manuscript — scRNA-seq sections ⏳ TODO
 12. Spatial omics benchmark (Visium/HD/Xenium) — see `SPATIAL.md` — **after step 11**
