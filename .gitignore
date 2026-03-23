@@ -126,3 +126,5 @@ dmypy.json
 # Project-specific
 data/
 *.sif
+results/
+logs/
