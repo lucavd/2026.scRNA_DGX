@@ -338,28 +338,32 @@ def chunked_scale_covariance_pca(
     n_cells = X_sparse.shape[0]
     n_hvgs = len(hvg_indices)
 
-    # Convert to CSC for efficient column slicing
-    print(f"    Converting to CSC for column slicing...")
+    # Extract HVG columns WITHOUT creating a full CSC copy.
+    # scipy's CSR[:, cols] internally converts the entire matrix to CSC (~400 GB).
+    # Instead, extract in row batches: each batch is small (100k x 44k),
+    # so the temporary CSC per batch is only ~3 GB, not 400 GB.
+    print(f"    Extracting {n_hvgs} HVG columns via row-batch slicing (no full CSC)...")
     t0 = time.perf_counter()
-    X_csc = X_sparse.tocsc()
-    print(f"    CSC conversion: {time.perf_counter() - t0:.1f}s")
-
-    # Extract HVG columns as a new sparse matrix (still sparse, n_cells x n_hvgs)
-    print(f"    Extracting {n_hvgs} HVG columns...")
-    t0 = time.perf_counter()
-    X_hvg_sparse = X_csc[:, hvg_indices]
-    # Convert back to CSR for efficient row slicing in batches
-    if not sp.issparse(X_hvg_sparse):
-        X_hvg_sparse = sp.csr_matrix(X_hvg_sparse)
-    elif not sp.isspmatrix_csr(X_hvg_sparse):
-        X_hvg_sparse = X_hvg_sparse.tocsr()
+    if not sp.isspmatrix_csr(X_sparse):
+        X_sparse = sp.csr_matrix(X_sparse)
+    extract_batch = batch_size  # reuse the same batch size (100k cells)
+    hvg_chunks = []
+    for start in range(0, n_cells, extract_batch):
+        end = min(start + extract_batch, n_cells)
+        # Row slice on CSR is O(1); column slice on small matrix is cheap
+        row_chunk = X_sparse[start:end]          # CSR row slice: fast, no copy
+        hvg_chunk = row_chunk[:, hvg_indices]     # col slice on 100k x 44k: tiny CSC
+        hvg_chunks.append(sp.csr_matrix(hvg_chunk))
+        if start % (extract_batch * 20) == 0 and start > 0:
+            print(f"      Batch {start // extract_batch}/{n_cells // extract_batch} "
+                  f"(RAM: {get_peak_ram_gb():.1f} GB)")
+    X_hvg_sparse = sp.vstack(hvg_chunks, format="csr")
+    del hvg_chunks
+    gc.collect()
     print(f"    HVG extraction: {time.perf_counter() - t0:.1f}s, "
           f"shape={X_hvg_sparse.shape}, "
           f"nnz={X_hvg_sparse.nnz:,}, "
           f"sparse size={X_hvg_sparse.data.nbytes / (1024**3):.2f} GB")
-
-    del X_csc
-    gc.collect()
 
     # --- Pass 1: compute mean and std from sparse batches ---
     print(f"    Pass 1: computing per-gene mean/std from sparse batches...")
@@ -609,8 +613,11 @@ def run_pipeline(
 
     time_step("normalization", normalize, timings, memory, n_gpus)
 
-    # Save raw for DE later (sparse, before HVG subset)
-    adata.raw = adata.copy()
+    # Save raw for DE later (sparse, before HVG subset).
+    # NOTE: adata.raw = adata.copy() would duplicate the entire ~420 GB sparse
+    # matrix. Instead, use adata.raw = adata which only creates a lightweight
+    # AnnData view that shares the underlying sparse arrays (no RAM increase).
+    adata.raw = adata
 
     # --- Step 4: HVG selection (CHUNKED — no dense matrix) ---
     def hvg_select():
@@ -659,10 +666,29 @@ def run_pipeline(
 
     time_step("fused_scale_pca", fused_scale_pca, timings, memory, n_gpus)
 
-    # Subset adata to HVGs (needed for anndata_to_GPU structure)
-    adata = adata[:, adata.var["highly_variable"]].copy()
-    # Replace dense/sparse X with empty — not needed after PCA
-    adata.X = sp.csr_matrix((adata.n_obs, adata.n_vars), dtype=np.float32)
+    # Subset adata to HVGs for anndata_to_GPU structure.
+    # MEMORY-CRITICAL: delete the large sparse X before subsetting to avoid
+    # holding two copies (~420 GB each) simultaneously.
+    n_obs = adata.n_obs
+    hvg_var = adata.var[adata.var["highly_variable"]].copy()
+    X_pca = adata.obsm["X_pca"]
+    pca_uns = adata.uns.get("pca", {})
+    obs_df = adata.obs.copy()
+
+    # Drop the heavy adata object (releases ~420 GB sparse matrix)
+    del adata
+    gc.collect()
+    ram_after_del = get_peak_ram_gb()
+    print(f"    Released original adata (RAM after: {ram_after_del:.1f} GB)")
+
+    # Reconstruct lightweight adata with empty X + PCA coords
+    adata = sc.AnnData(
+        X=sp.csr_matrix((n_obs, len(hvg_var)), dtype=np.float32),
+        obs=obs_df,
+        var=hvg_var,
+    )
+    adata.obsm["X_pca"] = X_pca
+    adata.uns["pca"] = pca_uns
     print(f"    After HVG subset + lean X: {adata.n_obs:,} cells x {adata.n_vars:,} genes")
     print(f"    X_pca: {adata.obsm['X_pca'].shape} ({adata.obsm['X_pca'].nbytes / (1024**2):.0f} MB)")
 
@@ -856,6 +882,8 @@ Examples:
                         help="Binary search for max cells before OOM.")
     parser.add_argument("--fine-low", type=int, default=0)
     parser.add_argument("--fine-high", type=int, default=0)
+    parser.add_argument("--coarse-start", type=int, default=0,
+                        help="Resume coarse search from this cell count (skip lower targets).")
     parser.add_argument("--skip-de", action="store_true")
     parser.add_argument("--clustering", type=str, default="leiden",
                         choices=["leiden", "kmeans"])
@@ -927,19 +955,33 @@ def _run_in_subprocess(
         "--clustering", clustering,
     ]
     print(f"  Launching subprocess: target={target_cells:,} cells, {n_gpus} GPUs")
-    result = _sp.run(cmd, timeout=86400)
-    if result.returncode == 0:
-        return True
-    if result.returncode == OOM_EXIT_CODE:
+    try:
+        result = _sp.run(cmd, timeout=86400)
+    except _sp.TimeoutExpired:
+        print(f"  >>> TIMEOUT at {target_cells:,} cells (24h limit)")
         return False
-    if result.returncode == INVALID_BENCHMARK_EXIT_CODE:
+    rc = result.returncode
+    if rc == 0:
+        return True
+    if rc == OOM_EXIT_CODE:
+        return False
+    # Signal 9 (SIGKILL) = OOM killer; signal 7 (SIGBUS) = memory mapping failure
+    # Negative return codes mean killed by signal: rc = -signal_number
+    if rc < 0:
+        sig = -rc
+        print(f"  >>> Killed by signal {sig} (likely OOM killer) at {target_cells:,} cells")
+        return False
+    if rc == INVALID_BENCHMARK_EXIT_CODE:
         raise RuntimeError(f"Dask cluster failed for target={target_cells:,}")
-    raise RuntimeError(f"Subprocess failed (exit {result.returncode}) for {target_cells:,} cells")
+    # Any other non-zero exit: treat as failure, don't crash the search
+    print(f"  >>> Subprocess failed (exit {rc}) at {target_cells:,} cells — treating as OOM")
+    return False
 
 
 def run_find_limit(
     adata_path: Path, n_gpus: int, output_dir: Path,
-    fine_low: int = 0, fine_high: int = 0, clustering: str = "leiden",
+    fine_low: int = 0, fine_high: int = 0, coarse_start: int = 0,
+    clustering: str = "leiden",
 ) -> None:
     script_path = str(Path(__file__).resolve())
     stem = adata_path.stem
@@ -961,7 +1003,13 @@ def run_find_limit(
     else:
         # Coarse search: start at 12M (previous limit), step by ~3.4M
         coarse_targets = list(range(12_000_000, 50_000_000, n_source))
-        print(f"\n--- Phase 1: Coarse search (start at 12M, step ~{n_source:,}) ---")
+        if coarse_start > 0:
+            coarse_targets = [t for t in coarse_targets if t >= coarse_start]
+            last_success = max(t for t in range(12_000_000, coarse_start, n_source))
+            print(f"\n--- Phase 1: Coarse search (RESUME from {coarse_start:,}, "
+                  f"previous success at {last_success:,}) ---")
+        else:
+            print(f"\n--- Phase 1: Coarse search (start at 12M, step ~{n_source:,}) ---")
         for target in coarse_targets:
             print(f"\n>>> Trying {target:,} cells...")
             success = _run_in_subprocess(
@@ -1044,7 +1092,8 @@ def main() -> None:
 
     if args.find_limit:
         print(f"\nSystem RAM: {psutil.virtual_memory().total / (1024**3):.0f} GB")
-        run_find_limit(adata_path, n_gpus, output_dir, args.fine_low, args.fine_high, args.clustering)
+        run_find_limit(adata_path, n_gpus, output_dir, args.fine_low, args.fine_high,
+                       args.coarse_start, args.clustering)
     else:
         init_nvml()
         try:

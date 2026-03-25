@@ -64,6 +64,7 @@ The user is NOT a DGX/HPC expert. This is one of the first times using this infr
 11. **Manuscript (scRNA-seq part)**: Write the single-cell sections of the full-length paper. ⏳ TODO
 12. **Spatial omics benchmark**: Extend to Visium/Visium HD/Xenium — see `SPATIAL.md`. ⏳ TODO (after step 11)
 13. **Manuscript (spatial part + finalize)**: Add spatial sections, condense to 4–5 pages for CIBB 2026. ⏳ TODO
+14. ~~**GPU-native scRNA tool**~~: CANCELLED — rapids-singlecell v0.14+ already provides GPU-native preprocessing (QC, HVG, normalize on sparse CuPy) AND GPU-native DE (Wilcoxon with custom CUDA kernels, t-test, wilcoxon_binned for Dask). Our v0.14.1 container already uses these. No gap to fill.
 
 ### Local Machine Setup
 - **Docker**: Must be installed with NVIDIA Container Toolkit (`nvidia-docker`) for GPU passthrough.
@@ -850,6 +851,7 @@ Follow the **Suggested Step Sequence** in the "Development Rules" section above.
 11. Manuscript — scRNA-seq sections ⏳ TODO
 12. Spatial omics benchmark (Visium/HD/Xenium) — see `SPATIAL.md` — **after step 11**
 13. Manuscript — spatial sections + finalize → condense for CIBB 2026
+14. ~~GPU-native scRNA tool~~ — CANCELLED (rapids-singlecell v0.14+ already covers this)
 
 **Each step requires user approval before proceeding to the next.**
 

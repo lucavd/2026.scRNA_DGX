@@ -37,6 +37,9 @@ RUN pip install --no-cache-dir --no-deps rapids-singlecell && \
     h5py \
     leidenalg \
     igraph \
+    squidpy \
+    spatialdata \
+    spatialdata-io \
     && pip cache purge \
     && chmod -R o+rX /opt/conda
 

@@ -128,3 +128,6 @@ data/
 *.sif
 results/
 logs/
+
+# Spatial benchmark data (large files, not tracked)
+SPATIAL/data/
