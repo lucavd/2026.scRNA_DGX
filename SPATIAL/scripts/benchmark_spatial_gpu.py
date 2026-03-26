@@ -170,19 +170,30 @@ def init_rmm_pool(device_index: int = 0) -> dict:
     handle = pynvml.nvmlDeviceGetHandleByIndex(device_index)
     total_vram = pynvml.nvmlDeviceGetMemoryInfo(handle).total
 
-    # Use RMM defaults (50% initial, 100% max) — safe and optimal
-    rmm.reinitialize(
-        pool_allocator=True,
-        devices=device_index,
-    )
-
-    pool_config = {
-        "pool_allocator": True,
-        "total_vram_gb": round(total_vram / (1024**3), 1),
-        "initial_pool": "50% (RMM default)",
-        "maximum_pool": "100% (RMM default)",
-    }
-    print(f"  RMM pool enabled: {pool_config['total_vram_gb']} GB total VRAM")
+    # Try RMM pool — may fail on older drivers (e.g. 535.x / CUDA 12.2)
+    try:
+        rmm.reinitialize(
+            pool_allocator=True,
+            devices=device_index,
+        )
+        pool_config = {
+            "pool_allocator": True,
+            "total_vram_gb": round(total_vram / (1024**3), 1),
+            "initial_pool": "50% (RMM default)",
+            "maximum_pool": "100% (RMM default)",
+        }
+        print(f"  RMM pool enabled: {pool_config['total_vram_gb']} GB total VRAM")
+    except Exception as e:
+        print(f"  RMM pool failed ({e}), continuing without pool allocator")
+        # Reset CuPy allocator to default — RMM import registers itself
+        # as CuPy's allocator, so all cp.empty() calls would fail too
+        cp.cuda.set_allocator(cp.cuda.MemoryPool().malloc)
+        pool_config = {
+            "pool_allocator": False,
+            "total_vram_gb": round(total_vram / (1024**3), 1),
+            "initial_pool": "none (driver incompatible)",
+            "maximum_pool": "none",
+        }
     return pool_config
 
 

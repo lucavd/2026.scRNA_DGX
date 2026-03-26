@@ -1,0 +1,14 @@
+# Minimal test container: RAPIDS 24.06 + CUDA 12.2
+# Purpose: verify that RAPIDS works with DGX driver 535.183.01 (CUDA 12.2)
+# If this works → driver incompatibility confirmed, rebuild full container on 24.06
+FROM nvcr.io/nvidia/rapidsai/base:24.06-cuda12.2-py3.11
+
+USER root
+
+# Only install rapids-singlecell (minimal deps, cuml/cupy already in base)
+RUN pip install --no-cache-dir rapids-singlecell scanpy anndata && \
+    pip cache purge && \
+    chmod -R o+rX /opt/conda
+
+WORKDIR /workspace
+CMD ["/bin/bash"]

@@ -79,8 +79,22 @@ Concordance: Moran's I ρ = 1.0, Geary's C ρ = 0.9999, SVG Jaccard (top50) = 1.
 5. **Concordance is excellent**: Moran's I and Geary's C are numerically identical (ρ ≥ 0.9999)
 6. **Cluster concordance lower than scRNA-seq**: ARI 0.63-0.86 (vs 0.96 for scRNA-seq) — expected, spatial data is sparser
 
-### Pending (DGX)
+### RESOLVED: Driver incompatibility (discovered 2026-03-25, fixed 2026-03-26)
 
+**DGX driver 535.183.01 (CUDA 12.2) is incompatible with RAPIDS 26.02 (CUDA 12.8+).**
+
+Root cause: RAPIDS 26.02 / RMM 26.02 requires driver 570+ for advanced CUDA VMM APIs. Driver 535 only supports CUDA 12.2.
+
+**Fix: Rebuild container on RAPIDS 24.06 (CUDA 12.2).** Verified with minimal test container (`Dockerfile.test`):
+- CuPy 13.2.0: PASS
+- RMM 24.06: PASS (pool init + allocation)
+- rapids-singlecell (anndata_to_GPU + normalize + log1p): PASS
+
+Next step: rebuild full container with all spatial dependencies on `rapidsai/base:24.06-cuda12.2-py3.11`.
+
+### Pending (DGX) — blocked until driver/container fix
+
+- [ ] Smoke test GPU spatial on DGX (Visium v1, 1 repeat)
 - [ ] Full-scale Visium HD 2µm (6.3M bins, no subsampling) — needs DGX RAM
 - [ ] Multi-GPU scaling (1/2/4/8 GPU on Visium HD)
 - [ ] 5 repeats for all configurations
