@@ -28,26 +28,34 @@ else
     echo "FAILED: sc-gpu-benchmark not found"; exit 1
 fi
 
-CONTAINER=${WORKDIR}/sc-benchmark-test.sif
+CONTAINER=${WORKDIR}/sc-benchmark-2406.sif
 SINGULARITY=/cm/shared/apps/singularity/4.2.0/bin/singularity
 BIND_ARGS=(-B /home/u0044:/home/u0044)
 [ -d /mnt/home/u0044 ] && BIND_ARGS+=(-B /mnt/home/u0044:/mnt/home/u0044)
 
-echo "=== Driver test with RAPIDS 24.06 NGC base container ==="
+run_in_container() {
+    "${SINGULARITY}" exec --nv "${BIND_ARGS[@]}" "${CONTAINER}" "$@"
+}
+
+CONTAINER_PYTHON=$(run_in_container bash -lc 'for py in python python3 /opt/conda/bin/python /usr/bin/python3; do
+    if command -v "$py" >/dev/null 2>&1; then command -v "$py"; exit 0; fi
+    if [[ "$py" = /* && -x "$py" ]]; then echo "$py"; exit 0; fi
+done; exit 1')
+
+if [ $? -ne 0 ] || [ -z "${CONTAINER_PYTHON}" ]; then
+    echo "FAILED: no Python found in container"
+    exit 1
+fi
+
+echo "=== Driver test with full RAPIDS 24.06 container ==="
 echo "Container: ${CONTAINER}"
+echo "Python: ${CONTAINER_PYTHON}"
 echo "Node: $(hostname)"
 echo ""
 
-# Show GPU info from host
 nvidia-smi
 
 echo ""
-echo "=== Fixing permissions + installing + testing ==="
-"${SINGULARITY}" exec --nv --writable-tmpfs "${BIND_ARGS[@]}" "${CONTAINER}" \
-    bash -lc '
-echo "Python: $(which python3)"
-python3 --version
-echo ""
 echo "=== Running GPU driver test ==="
-python3 '"${WORKDIR}"'/scripts/test_gpu_driver.py
-'
+
+run_in_container bash -lc "${CONTAINER_PYTHON} ${WORKDIR}/scripts/test_gpu_driver.py"
