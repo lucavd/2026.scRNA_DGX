@@ -1,7 +1,6 @@
-# Dockerfile for scRNA-seq + spatial omics GPU vs CPU benchmark
-# Base: RAPIDS 24.06 / CUDA 12.2 — compatible with DGX driver 535.183.01
-# Validated with Dockerfile.test (CuPy, RMM, rapids-singlecell all PASS)
-FROM nvcr.io/nvidia/rapidsai/base:24.06-cuda12.2-py3.11
+# Dockerfile for scRNA-seq GPU vs CPU benchmark
+# Base: NVIDIA RAPIDS with CUDA 12, Python 3.12
+FROM nvcr.io/nvidia/rapidsai/base:26.02-cuda12-py3.12
 
 # Avoid interactive prompts during package installation
 ENV DEBIAN_FRONTEND=noninteractive
@@ -16,34 +15,28 @@ RUN mkdir -p /var/lib/apt/lists/partial && \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# constraints.txt pins RAPIDS 24.06 base packages (dask, numpy, etc.)
-# to prevent pip from upgrading them and breaking cuDF/dask_cudf
-COPY constraints.txt /tmp/constraints.txt
-COPY requirements-squidpy.txt /tmp/requirements-squidpy.txt
-
+# Install Python packages via pip
+# Split into two steps:
+# 1) rapids-singlecell without deps (cuml/cupy already in RAPIDS base)
+# 2) Everything else
 RUN pip install --no-cache-dir --no-deps rapids-singlecell && \
-    pip install --no-cache-dir -c /tmp/constraints.txt \
-    docrep \
+    pip install --no-cache-dir \
     scanpy \
-    anndata
-
-RUN pip install --no-cache-dir -c /tmp/constraints.txt \
+    anndata \
     scvi-tools \
     cellxgene-census \
-    tiledbsoma
-
-RUN pip install --no-cache-dir -c /tmp/constraints.txt \
+    tiledbsoma \
     scikit-learn \
+    scipy \
+    pandas \
+    numpy \
     matplotlib \
     seaborn \
     psutil \
     nvidia-ml-py \
     h5py \
     leidenalg \
-    igraph
-
-RUN pip install --no-cache-dir -c /tmp/constraints.txt -r /tmp/requirements-squidpy.txt && \
-    pip install --no-cache-dir --no-deps squidpy==1.6.5 \
+    igraph \
     && pip cache purge \
     && chmod -R o+rX /opt/conda
 
