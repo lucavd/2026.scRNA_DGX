@@ -61,8 +61,9 @@ The user is NOT a DGX/HPC expert. This is one of the first times using this infr
 9. **Analysis and figures**: 6 publication-ready figures + summary table. ✅ DONE (locally)
 10. **Max-power stress test**: ✅ DONE — **11.9M cells** is the DGX limit (8×H100, 2 TB RAM). Bottleneck is CPU RAM (535/2048 GB at 11.9M), not GPU VRAM (49/640 GB = 7.6%). Optimizations: scatter covariance PCA, lean GPU transfer, RMM pool 2GB. Binary search: 12M FAIL (leiden OOM), 13.7M FAIL (scale OOM). KMeans GPU tested: same limit (CPU preprocessing, not clustering). Sparse-scatter tested at 14M: HVG selection OOM (scanpy preprocessing is the bottleneck).
 10b. **DE benchmark at scale**: ✅ DONE — 7 tests on 3.4M cells × 41k genes × 81 clusters. Pseudo-bulk fastest (128s, 44× vs CPU t-test). Wilcoxon GPU (826s) beats t-test GPU (1656s). Multi-GPU ≈ single-GPU for DE (I/O bound).
+10c. **Chunked preprocessing stress test**: ✅ DONE — Inspired by ScaleSC (Hu et al. 2025), implemented chunked HVG selection and batch-wise PCA covariance accumulation to bypass dense matrix creation. 12M cells PASS (862 GB RAM, 10 GB VRAM, 9363s). 15M cells FAIL (OOM during CSR→CSC conversion at 1071 GB). Root cause: `adata.raw = adata.copy()` doubled RAM + full CSC conversion. Fixes applied (reference-only raw, batch column extraction) but not re-tested — diminishing returns (12M vs 11.9M = marginal improvement). VRAM dropped from 49 GB (Step 10) to 10 GB (1.5%) thanks to chunked GPU operations.
 11. **Manuscript (scRNA-seq part)**: Write the single-cell sections of the full-length paper. ⏳ TODO
-12. **Spatial omics benchmark**: Extend to Visium/Visium HD/Xenium — see `SPATIAL.md`. ⏳ TODO (after step 11)
+12. **Spatial omics benchmark**: ✅ DONE (locally) — Visium v1, HD 8um, HD 2um benchmarked on RTX 4090 (5 repeats each). See `SPATIAL/SPATIAL.md`. Key results: 1.7x speedup (Visium v1, 3k spots), **51.6x** (HD 8um, 393k bins), **10.8x** (HD 2um, 389k bins). co_occurrence **3,272x** at HD 8um. Spatial autocorrelation concordance: Moran/Geary rho >= 0.9995, SVG Jaccard top50 = 1.0. Cluster ARI degrades at 2um (0.08) due to cugraph vs leidenalg algorithmic differences. DGX full-scale runs blocked by driver 535 incompatibility.
 13. **Manuscript (spatial part + finalize)**: Add spatial sections, condense to 4–5 pages for CIBB 2026. ⏳ TODO
 14. ~~**GPU-native scRNA tool**~~: CANCELLED — rapids-singlecell v0.14+ already provides GPU-native preprocessing (QC, HVG, normalize on sparse CuPy) AND GPU-native DE (Wilcoxon with custom CUDA kernels, t-test, wilcoxon_binned for Dask). Our v0.14.1 container already uses these. No gap to fill.
 
@@ -474,18 +475,21 @@ sc-gpu-benchmark/
 │   ├── benchmark_cpu.py      # CPU-only Scanpy pipeline
 │   ├── benchmark_gpu.py      # Single-GPU RAPIDS pipeline
 │   ├── benchmark_multigpu.py # Multi-GPU RAPIDS + Dask pipeline
-│   ├── benchmark_maxpower.py # Max-power stress test (find DGX cell limit)
-│   ├── compare_results.py    # Concordance + stability analysis
-│   └── generate_figures.py   # Publication-ready plots
+│   ├── benchmark_maxpower.py         # Max-power stress test (find DGX cell limit)
+│   ├── benchmark_maxpower_chunked.py # Chunked preprocessing stress test (Step 10c)
+│   ├── compare_results.py            # Concordance + stability analysis
+│   └── generate_figures.py           # Publication-ready plots
 ├── slurm/
-│   ├── download.sh           # SLURM job: data download (1.3M)
-│   ├── download_full.sh      # SLURM job: download full ~3.6M mouse brain
-│   ├── cpu_benchmark.sh      # SLURM job: CPU benchmarks
-│   ├── gpu_1.sh              # SLURM job: 1 GPU
-│   ├── gpu_2.sh              # SLURM job: 2 GPUs
-│   ├── gpu_4.sh              # SLURM job: 4 GPUs
-│   ├── gpu_8.sh              # SLURM job: 8 GPUs
-│   └── maxpower.sh           # SLURM job: max-power stress test (8 GPU, --find-limit)
+│   ├── download.sh                   # SLURM job: data download (1.3M)
+│   ├── download_full.sh              # SLURM job: download full ~3.6M mouse brain
+│   ├── cpu_benchmark.sh              # SLURM job: CPU benchmarks
+│   ├── gpu_1.sh                      # SLURM job: 1 GPU
+│   ├── gpu_2.sh                      # SLURM job: 2 GPUs
+│   ├── gpu_4.sh                      # SLURM job: 4 GPUs
+│   ├── gpu_8.sh                      # SLURM job: 8 GPUs
+│   ├── maxpower.sh                   # SLURM job: max-power stress test (8 GPU, --find-limit)
+│   ├── maxpower_chunked.sh           # SLURM job: chunked stress test (Step 10c)
+│   └── maxpower_chunked_single.sh    # SLURM job: single-target chunked test
 ├── manuscript/
 │   └── bibliography/         # BibTeX references for the paper
 ├── data/                     # Downloaded datasets (in home dir — 500 GB available)
@@ -768,6 +772,63 @@ This tradeoff MUST be discussed in the manuscript.
 
 ---
 
+## Chunked Preprocessing Stress Test (Step 10c)
+
+### Motivation
+
+Inspired by ScaleSC (Hu et al. 2025, Bioinformatics Advances), which claims 10–20M cells on a single A100 via chunked preprocessing. We implemented ScaleSC-style optimizations to see if we could push beyond the 11.9M limit from Step 10.
+
+### Optimizations implemented (in `benchmark_maxpower_chunked.py`)
+
+Three key differences from the Step 10 optimized pipeline:
+
+1. **Chunked HVG selection**: accumulate per-gene mean and variance across 100k-cell batches from the sparse matrix. Never creates the full dense matrix. Uses Seurat v1 method (same as standard pipeline) on accumulated statistics.
+
+2. **Batch-wise column extraction**: instead of converting the entire 15M × 44k sparse matrix to CSC format (~420 GB copy), extract the 2000 HVG columns in row-batches of 100k cells. Each batch is tiny (~3 GB CSC temporary) vs the full ~420 GB.
+
+3. **Fused scale+PCA via chunked covariance**: compute per-gene mean/std from sparse batches (pass 1), then accumulate `X.T @ X` covariance on 8 GPUs from scaled sparse batches (pass 2), eigendecompose (2000×2000), project (pass 3). Identical to Step 10's `_distributed_covariance_pca()` but fed from sparse batches instead of a pre-materialized dense matrix.
+
+### Results
+
+| Cells | Time | RAM | VRAM (total 8 GPU) | Status |
+|------:|-----:|----:|-------------------:|--------|
+| 12M | 9,363s (156 min) | 862 GB (42%) | 10 GB (1.5%) | **PASS** |
+| 15M | — | 1,071 GB (53%) | 4.8 GB | **FAIL** (OOM at CSR→CSC conversion) |
+
+### Comparison with Step 10 at 11.9M cells
+
+| Metric | Step 10 (optimized) | Step 10c (chunked) at 12M |
+|:-------|--------------------:|--------------------------:|
+| Cell limit | 11.9M | 12M (+0.8%) |
+| Peak RAM | 535 GB (26%) | 862 GB (42%) |
+| Peak VRAM | 49 GB (7.6%) | 10 GB (1.5%) |
+| Time | 119 min | 156 min |
+
+### Root cause of 15M failure
+
+The 15M crash happened during CSR→CSC conversion (full-matrix `tocsc()`). RAM was already at 1,071 GB after HVG selection due to:
+- `adata.raw = adata.copy()` duplicating the ~420 GB sparse matrix (fix: use reference instead of copy)
+- Full CSC conversion adding another ~420 GB (fix: batch column extraction)
+
+Fixes were implemented but NOT re-tested on DGX — diminishing returns (12M vs 11.9M is marginal, and the 15M failure suggests the next bottleneck would appear around 16–18M anyway due to other Scanpy internals).
+
+### Key finding for the paper
+
+The chunked preprocessing reduced **VRAM from 49 GB to 10 GB** (5× reduction), confirming that GPU memory is not the bottleneck at any scale. However, it did NOT significantly increase the cell limit because **CPU RAM remains the constraint**: Scanpy's sparse matrix + metadata at ~35 GB per million cells (QC metrics, obs DataFrame, raw copy) consumes most of the 2 TB.
+
+### ScaleSC comparison (for Discussion section)
+
+ScaleSC (Hu et al. 2025) claims 10–20M cells on a single A100 (80 GB) by:
+- Chunked batch reader (`max_cell_batch=100k`)
+- Two-pass PCA (same covariance method as our scatter PCA)
+- Custom CUDA kernels for sparse mean/variance
+- Seurat v3 HVG (different from our v1)
+- No `adata.raw` copy (key difference)
+
+Their claim of 20M cells on 80 GB GPU suggests they also avoid Scanpy's metadata overhead — they use a custom `AnnDataBatchReader` that never holds the full AnnData in memory. Our pipeline keeps the full AnnData on CPU (for compatibility with downstream rapids-singlecell steps), which is why CPU RAM remains the bottleneck.
+
+---
+
 ## DE Benchmark at Scale (Step 10b)
 
 ### Problem
@@ -848,8 +909,9 @@ Follow the **Suggested Step Sequence** in the "Development Rules" section above.
 9. Analysis and figure generation ✅ DONE (6 figures + summary table)
 10. Max-power stress test ✅ DONE — **11.9M cells** is the DGX limit (8×H100, 2 TB RAM). Bottleneck is CPU RAM (535/2048 GB at 11.9M), not GPU VRAM (49/640 GB = 7.6%). Optimizations: scatter covariance PCA, lean GPU transfer, RMM pool 2GB. Binary search: 12M FAIL (leiden OOM), 13.7M FAIL (scale OOM). KMeans GPU tested: same limit (CPU preprocessing, not clustering). Sparse-scatter tested at 14M: HVG selection OOM (scanpy preprocessing is the bottleneck).
 10b. DE benchmark at scale ✅ DONE — 7 tests on 3.4M cells × 41k genes × 81 clusters. Pseudo-bulk fastest (128s, 44× vs CPU t-test). Wilcoxon GPU (826s) beats t-test GPU (1656s). Multi-GPU ≈ single-GPU for DE (I/O bound).
+10c. Chunked preprocessing stress test ✅ DONE — ScaleSC-inspired chunked HVG + batch PCA. 12M PASS (862 GB RAM, 10 GB VRAM). 15M FAIL (CSR→CSC OOM). Marginal improvement over Step 10 (12M vs 11.9M). VRAM dropped 5× (49→10 GB). CPU RAM remains the bottleneck.
 11. Manuscript — scRNA-seq sections ⏳ TODO
-12. Spatial omics benchmark (Visium/HD/Xenium) — see `SPATIAL.md` — **after step 11**
+12. Spatial omics benchmark ✅ DONE (locally) — Visium v1 (1.7x), HD 8um (51.6x), HD 2um (10.8x). co_occurrence 3,272x. Moran/Geary rho >= 0.9995. DGX blocked (driver 535).
 13. Manuscript — spatial sections + finalize → condense for CIBB 2026
 14. ~~GPU-native scRNA tool~~ — CANCELLED (rapids-singlecell v0.14+ already covers this)
 

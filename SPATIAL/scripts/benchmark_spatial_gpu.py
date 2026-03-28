@@ -6,17 +6,16 @@ for expression analysis and GPU-accelerated spatial operations, with Squidpy
 as fallback for steps without GPU support.
 
 GPU-accelerated spatial steps:
-- spatial_autocorr (Moran's I, Geary's C) — rsc.gr.spatial_autocorr
-- co_occurrence — rsc.gr.co_occurrence
-- ligrec — rsc.gr.ligrec
+- spatial_autocorr (Moran's I, Geary's C) -- rsc.gr.spatial_autocorr
+- co_occurrence -- rsc.gr.co_occurrence
 
 CPU-only spatial steps (no GPU equivalent):
-- spatial_neighbors — sq.gr.spatial_neighbors
-- nhood_enrichment — sq.gr.nhood_enrichment
+- spatial_neighbors -- sq.gr.spatial_neighbors
+- nhood_enrichment -- sq.gr.nhood_enrichment
 
 Supports two platforms:
-- Visium v1 (~3,000 spots, 55 µm resolution)
-- Visium HD (~300k-500k bins, 8 µm resolution)
+- Visium v1 (~3,000 spots, 55 um resolution)
+- Visium HD (~300k-500k bins, 8 um resolution)
 
 Usage:
     python SPATIAL/scripts/benchmark_spatial_gpu.py \\
@@ -59,7 +58,7 @@ LEIDEN_RESOLUTION = 1.0
 N_TOP_HVGS = 2000
 
 
-# ── GPU monitoring helpers ───────────────────────────────────────────────
+# -- GPU monitoring helpers ---------------------------------------------------
 
 def init_nvml() -> None:
     """Initialize NVML for GPU memory monitoring."""
@@ -155,12 +154,6 @@ def get_gpu_info(device_index: int = 0) -> dict:
 def init_rmm_pool(device_index: int = 0) -> dict:
     """Initialize RMM memory pool for optimal GPU allocation performance.
 
-    Without a pool, every GPU allocation goes through cudaMalloc which is slow.
-    The pool pre-allocates memory so subsequent allocations are near-instant.
-
-    RMM 26.02+ defaults: initial_pool_size = 50% VRAM, maximum = 100% VRAM.
-    CuPy allocator is registered automatically by rmm.reinitialize().
-
     Args:
         device_index: GPU device index.
 
@@ -170,37 +163,22 @@ def init_rmm_pool(device_index: int = 0) -> dict:
     handle = pynvml.nvmlDeviceGetHandleByIndex(device_index)
     total_vram = pynvml.nvmlDeviceGetMemoryInfo(handle).total
 
-    # Try RMM pool — may fail on older drivers (e.g. 535.x / CUDA 12.2)
-    try:
-        rmm.reinitialize(
-            pool_allocator=True,
-            devices=device_index,
-        )
-        pool_config = {
-            "pool_allocator": True,
-            "total_vram_gb": round(total_vram / (1024**3), 1),
-            "initial_pool": "50% (RMM default)",
-            "maximum_pool": "100% (RMM default)",
-        }
-        print(f"  RMM pool enabled: {pool_config['total_vram_gb']} GB total VRAM")
-    except Exception as e:
-        print(f"  RMM pool failed ({e}), continuing without pool allocator")
-        # Reset CuPy allocator to default — RMM import registers itself
-        # as CuPy's allocator, so all cp.empty() calls would fail too
-        cp.cuda.set_allocator(cp.cuda.MemoryPool().malloc)
-        pool_config = {
-            "pool_allocator": False,
-            "total_vram_gb": round(total_vram / (1024**3), 1),
-            "initial_pool": "none (driver incompatible)",
-            "maximum_pool": "none",
-        }
+    # Use RMM pool allocator: pre-allocates memory so allocations are fast.
+    # Default: 50% initial, 100% max.
+    rmm.reinitialize(pool_allocator=True)
+
+    pool_config = {
+        "pool_allocator": True,
+        "total_vram_gb": round(total_vram / (1024**3), 1),
+    }
+    print(f"  RMM pool initialized: {pool_config['total_vram_gb']} GB total VRAM")
     return pool_config
 
 
 def gpu_warmup() -> None:
     """Run a small dummy operation to warm up the CUDA context."""
     print("  GPU warmup (CUDA context + JIT)...", end=" ", flush=True)
-    a = cp.random.random((100, 100), dtype=cp.float32)
+    a = cp.ones((100, 100), dtype=cp.float32)
     _ = cp.dot(a, a)
     cp.cuda.Stream.null.synchronize()
     del a, _
@@ -208,7 +186,7 @@ def gpu_warmup() -> None:
     print("done")
 
 
-# ── Data loading ─────────────────────────────────────────────────────────
+# -- Data loading -------------------------------------------------------------
 
 def load_visium(data_dir: Path) -> sc.AnnData:
     """Load a standard Visium dataset."""
@@ -271,7 +249,7 @@ def load_visium_hd(data_dir: Path, bin_size: str = "square_008um") -> sc.AnnData
     return adata
 
 
-# ── Main pipeline ────────────────────────────────────────────────────────
+# -- Main pipeline ------------------------------------------------------------
 
 def run_pipeline(
     data_dir: Path,
@@ -283,7 +261,7 @@ def run_pipeline(
     """Run the GPU spatial pipeline with timing.
 
     Phase A: Expression analysis on GPU (rapids-singlecell)
-    Phase B: Spatial analysis — GPU where available, CPU fallback otherwise
+    Phase B: Spatial analysis -- GPU where available, CPU fallback otherwise
 
     Args:
         data_dir: Base data directory.
@@ -300,7 +278,7 @@ def run_pipeline(
 
     label = f"{platform}" if platform == "visium" else f"{platform} ({bin_size})"
     print(f"\n{'=' * 80}")
-    print(f"SPATIAL GPU BENCHMARK — {label} — GPU {device_index}")
+    print(f"SPATIAL GPU BENCHMARK -- {label} -- GPU {device_index}")
     print(f"{'=' * 80}")
 
     # Initialize RMM + warmup
@@ -314,9 +292,9 @@ def run_pipeline(
     )
     print(f"  {'-'*30}-+-{'-'*8}-+-{'-'*20}-+-{'-'*20}")
 
-    # ── Phase A: Expression analysis on GPU ──────────────────────────────
+    # -- Phase A: Expression analysis on GPU ----------------------------------
 
-    # 1. Data loading (CPU read → GPU transfer)
+    # 1. Data loading (CPU read -> GPU transfer)
     if platform == "visium":
         load_fn = lambda: load_visium(data_dir)
     elif platform == "visium_hd":
@@ -335,10 +313,9 @@ def run_pipeline(
 
     n_spots_input = adata.n_obs
     n_genes_input = adata.n_vars
-    print(f"    Loaded: {n_spots_input:,} spots × {n_genes_input:,} genes")
+    print(f"    Loaded: {n_spots_input:,} spots x {n_genes_input:,} genes")
 
     # Optional subsampling (preserves spatial coordinates)
-    # Transfer back to CPU for subsampling, then re-transfer
     if max_spots is not None and adata.n_obs > max_spots:
         rsc.get.anndata_to_CPU(adata)
         np.random.seed(RANDOM_SEED)
@@ -355,9 +332,6 @@ def run_pipeline(
             rsc.pp.calculate_qc_metrics(adata, qc_vars=["mt"], log1p=False)
             adata.obs = adata.obs.copy()
             adata.var = adata.var.copy()
-            # Visium HD 2µm bins have very few genes per bin (median ~9),
-            # so min_genes=200 would filter nearly everything.
-            # Use min_genes=1 for HD (Space Ranger already filtered on-tissue).
             min_genes = 1 if platform == "visium_hd" else 200
             rsc.pp.filter_cells(adata, min_genes=min_genes)
             rsc.pp.filter_genes(adata, min_cells=3)
@@ -365,7 +339,7 @@ def run_pipeline(
     time_step("qc_filtering", qc_filter, timings, memory, device_index)
     n_spots_after_qc = adata.n_obs
     n_genes_after_qc = adata.n_vars
-    print(f"    After QC: {n_spots_after_qc:,} spots × {n_genes_after_qc:,} genes")
+    print(f"    After QC: {n_spots_after_qc:,} spots x {n_genes_after_qc:,} genes")
 
     # 3. Normalization
     def normalize():
@@ -397,7 +371,13 @@ def run_pipeline(
 
     time_step("pca", run_pca, timings, memory, device_index)
 
-    # 6. Expression neighbor graph (GPU)
+    # 6-8. Expression graph + clustering + embedding
+    n_after_qc = adata.n_obs
+    if n_after_qc > 100_000:
+        leiden_res = 0.1
+    else:
+        leiden_res = LEIDEN_RESOLUTION
+
     time_step(
         "expression_neighbors",
         lambda: rsc.pp.neighbors(
@@ -405,14 +385,6 @@ def run_pipeline(
         ),
         timings, memory, device_index,
     )
-
-    # 7. Leiden clustering (GPU, cugraph backend)
-    # Adapt resolution for large datasets
-    n_after_qc = adata.n_obs
-    if n_after_qc > 100_000:
-        leiden_res = 0.1
-    else:
-        leiden_res = LEIDEN_RESOLUTION
 
     time_step(
         "leiden",
@@ -423,28 +395,26 @@ def run_pipeline(
         timings, memory, device_index,
     )
 
-    labels = adata.obs["leiden_1.0"].values
-    if hasattr(labels, "get"):
-        labels = labels.get()
-    n_clusters = len(np.unique(np.asarray(labels)))
-    print(f"    Leiden clusters: {n_clusters} (resolution={leiden_res})")
-
-    # 8. UMAP (GPU)
     time_step(
         "umap",
         lambda: rsc.tl.umap(adata, random_state=RANDOM_SEED),
         timings, memory, device_index,
     )
 
-    # ── Phase B: Spatial-specific analysis ───────────────────────────────
+    labels = adata.obs["leiden_1.0"].values
+    if hasattr(labels, "get"):
+        labels = labels.get()
+    n_clusters = len(np.unique(np.asarray(labels)))
+    print(f"    Leiden clusters: {n_clusters} (resolution={leiden_res})")
 
-    print(f"\n  {'─── SPATIAL STEPS ───':^70}")
+    # -- Phase B: Spatial-specific analysis -----------------------------------
+
+    print(f"\n  {'--- SPATIAL STEPS ---':^70}")
 
     # Transfer back to CPU for spatial operations that need it
-    # Keep a GPU copy for GPU spatial operations
     rsc.get.anndata_to_CPU(adata)
 
-    # 9. Spatial neighbors (CPU only — no GPU equivalent in rsc)
+    # 9. Spatial neighbors (CPU only -- no GPU equivalent in rsc)
     time_step(
         "spatial_neighbors",
         lambda: sq.gr.spatial_neighbors(adata, coord_type="generic", delaunay=True),
@@ -455,12 +425,10 @@ def run_pipeline(
     rsc.get.anndata_to_GPU(adata)
 
     # Warmup for spatial_autocorr: the first call includes JIT compilation
-    # overhead for GPU spatial kernels. Run a small dummy autocorr to absorb
-    # this one-time cost (same approach as the main gpu_warmup).
+    # overhead for GPU spatial kernels.
     print("  spatial_autocorr warmup (JIT)...", end=" ", flush=True)
-    _warmup_adata = adata[:10, :5].copy()
-    # Need spatial connectivity for the warmup
     import scipy.sparse as sp
+    _warmup_adata = adata[:10, :5].copy()
     _n = _warmup_adata.n_obs
     _warmup_adata.obsp["spatial_connectivities"] = sp.eye(_n, format="csr")
     _warmup_adata.obsp["spatial_distances"] = sp.eye(_n, format="csr")
@@ -472,7 +440,7 @@ def run_pipeline(
     cp.cuda.Stream.null.synchronize()
     print("done")
 
-    # 10. Spatial autocorrelation — Moran's I (GPU)
+    # 10. Spatial autocorrelation -- Moran's I (GPU)
     time_step(
         "spatial_autocorr_moran",
         lambda: rsc.gr.spatial_autocorr(adata, mode="moran"),
@@ -483,7 +451,7 @@ def run_pipeline(
     n_svgs_moran = int((moranI["pval_norm_fdr_bh"] < 0.05).sum()) if len(moranI) > 0 else 0
     print(f"    SVGs (Moran's I, FDR < 0.05): {n_svgs_moran}")
 
-    # 11. Spatial autocorrelation — Geary's C (GPU)
+    # 11. Spatial autocorrelation -- Geary's C (GPU)
     time_step(
         "spatial_autocorr_geary",
         lambda: rsc.gr.spatial_autocorr(adata, mode="geary"),
@@ -494,9 +462,7 @@ def run_pipeline(
     n_svgs_geary = int((gearyC["pval_norm_fdr_bh"] < 0.05).sum()) if len(gearyC) > 0 else 0
     print(f"    SVGs (Geary's C, FDR < 0.05): {n_svgs_geary}")
 
-    # 12. Co-occurrence (GPU) — skip if too many clusters (O(k²) memory)
-    # Transfer back to CPU first — co_occurrence needs cluster labels as
-    # categorical on CPU, then rsc handles the GPU computation internally
+    # 12. Co-occurrence (GPU) -- skip if too many clusters (O(k^2) memory)
     rsc.get.anndata_to_CPU(adata)
     if n_clusters <= 500:
         time_step(
@@ -505,10 +471,10 @@ def run_pipeline(
             timings, memory, device_index,
         )
     else:
-        print(f"  co_occurrence: SKIPPED — {n_clusters} clusters (>500)")
+        print(f"  co_occurrence: SKIPPED -- {n_clusters} clusters (>500)")
         timings["co_occurrence"] = -1
 
-    # 13. Neighborhood enrichment (CPU only) — skip if too many clusters
+    # 13. Neighborhood enrichment (CPU only) -- skip if too many clusters
     if n_clusters <= 500:
         time_step(
             "nhood_enrichment",
@@ -516,11 +482,11 @@ def run_pipeline(
             timings, memory, device_index,
         )
     else:
-        print(f"  nhood_enrichment: SKIPPED — {n_clusters} clusters (>500)")
+        print(f"  nhood_enrichment: SKIPPED -- {n_clusters} clusters (>500)")
         timings["nhood_enrichment"] = -1
 
-    # 14. Ligand-receptor interaction (CPU — Squidpy)
-    # Skip at large scale (>100k spots) — very slow and not informative
+    # 14. Ligand-receptor interaction (CPU -- Squidpy)
+    # Skip at large scale (>100k spots) -- very slow and not informative
     if n_after_qc <= 100_000 and n_clusters <= 500:
         try:
             time_step(
@@ -536,17 +502,17 @@ def run_pipeline(
                 timings, memory, device_index,
             )
         except Exception as e:
-            print(f"  ligrec: SKIPPED — {e}")
+            print(f"  ligrec: SKIPPED -- {e}")
             timings["ligrec"] = -1
     else:
-        print(f"  ligrec: SKIPPED — large scale ({n_after_qc:,} spots)")
+        print(f"  ligrec: SKIPPED -- large scale ({n_after_qc:,} spots)")
         timings["ligrec"] = -1
 
-    # ── Transfer to CPU for output ───────────────────────────────────────
+    # -- Transfer to CPU for output -------------------------------------------
 
     rsc.get.anndata_to_CPU(adata)
 
-    # ── Summary ──────────────────────────────────────────────────────────
+    # -- Summary --------------------------------------------------------------
 
     timings["total"] = round(
         sum(v for v in timings.values() if v > 0), 4
@@ -586,11 +552,12 @@ def run_pipeline(
                 "numpy": np.__version__,
             },
             "spatial_gpu_coverage": {
+                "expression_steps": "gpu (rsc)",
                 "spatial_neighbors": "cpu_only (squidpy)",
                 "spatial_autocorr": "gpu (rsc.gr.spatial_autocorr)",
                 "co_occurrence": "gpu (rsc.gr.co_occurrence)",
                 "nhood_enrichment": "cpu_only (squidpy)",
-                "ligrec": "cpu_only (squidpy — rsc.gr.ligrec fails on dense GPU matrix)",
+                "ligrec": "cpu_only (squidpy)",
             },
         },
         "timings": timings,
