@@ -132,3 +132,4 @@ logs/
 
 # Spatial benchmark data (large files, not tracked)
 SPATIAL/data/
+SPATIAL/results/*.csv
