@@ -24,6 +24,7 @@ PANDOC_COMMON=(
     --bibliography "${BIB}"
     --number-sections
     --standalone
+    --resource-path "${SCRIPT_DIR}:${SCRIPT_DIR}/.."
 )
 
 build_docx() {
