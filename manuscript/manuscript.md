@@ -474,6 +474,10 @@ The authors declare no conflict of interest.
 The computational resources for the scRNA-seq benchmarks were provided by the
 UPSCALE/CONVECS DGX H100 cluster at the University of Padova.
 
+# Funding
+
+This study was co-funded by the BIRD 2024/START (SID) programs, Department of Cardio-Thoracic-Vascular Sciences (DCTV), University of Padua (PI: Daniele Sabbatini; 2024DCTV1SIDPROGETTI-00183) and by the Italian Complementary National Plan PNC-I.1 "Research initiatives for innovative technologies and pathways in the health and welfare sector" D.D. 931 of 06/06/2022, "DARE-DigitAl lifelong pRevEntion" initiative, code PNC0000002, CUP: B53C22006450001.
+
 # Availability of Data and Software Code
 
 All code, Dockerfiles, SLURM submission scripts, and benchmark result JSON
