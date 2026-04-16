@@ -24,18 +24,6 @@
   doi       = {10.48550/arXiv.2603.02402}
 }
 
-% [A] Recommended citation for the RAPIDS/cuML ecosystem underpinning GPU-accelerated ML in rapids-singlecell.
-@article{Raschka2020,
-  author    = {Raschka, Sebastian and Patterson, Joshua and Nolet, Corey},
-  title     = {Machine Learning in {Python}: Main Developments and Technology Trends in Data Science, Machine Learning, and Artificial Intelligence},
-  journal   = {Information},
-  year      = {2020},
-  volume    = {11},
-  number    = {4},
-  pages     = {193},
-  doi       = {10.3390/info11040193}
-}
-
 % [A] Citation for AnnData, the shared data structure used by both Scanpy and rapids-singlecell.
 @article{Virshup2024,
   author    = {Virshup, Isaac and Rybakov, Sergei and Theis, Fabian J. and Angerer, Philipp and Wolf, F. Alexander},
@@ -71,24 +59,12 @@
   doi       = {10.21105/joss.00861}
 }
 
-% [A] Citation for CZ CELLxGENE Discover, the data platform from which benchmark datasets were sourced.
-@article{CZI2025,
-  author    = {{CZI Cell Science Program} and Abdulla, Shibla and Aevermann, Brian and Assis, Pedro and Badajoz, Seve and Bell, Sidney M. and Bezzi, Emanuele and Cakir, Batuhan and Chaffer, Jim and Chambers, Signe and Cherry, J. Michael and Chi, Tiffany and Chien, Jennifer and Dorman, Leah and Garcia-Nieto, Pablo and Gloria, Nayib and Hastie, Mim and Hegeman, Daniel and Hilton, Jason and Huang, Timmy and Infeld, Amanda and Istrate, Ana-Maria and Jelic, Ivana and Katsuya, Kuni and Kim, Yang Joon and Liang, Karen and Lin, Mike and Lombardo, Maximilian and Marshall, Bailey and Martin, Bruce and McDade, Fran and Megill, Colin and Patel, Nikhil and Predeus, Alexander and Raymor, Brian and Robatmili, Behnam and Rogers, Dave and Rutherford, Erica and Sadgat, Dana and Shin, Andrew and Small, Corinn and Smith, Trent and Sridharan, Prathap and Tarashansky, Alexander and Tavares, Norbert and Thomas, Harley and Tolopko, Andrew and Urisko, Meghan and Yan, Joyce and Yeretssian, Garabet and Zamanian, Jennifer and Mani, Arathi and Cool, Jonah and Carr, Ambrose},
-  title     = {{CZ CELLxGENE Discover}: a single-cell data platform for scalable exploration, analysis and modeling of aggregated data},
-  journal   = {Nucleic Acids Research},
-  year      = {2025},
-  volume    = {53},
-  number    = {D1},
-  pages     = {D886--D900},
-  doi       = {10.1093/nar/gkae1142}
-}
-
 % [A] Citation for Dask, the distributed-computing framework used for out-of-core and multi-GPU scheduling.
 @inproceedings{Rocklin2015,
   author    = {Rocklin, Matthew},
   title     = {Dask: Parallel Computation with Blocked algorithms and Task Scheduling},
   booktitle = {Proceedings of the 14th Python in Science Conference},
-  pages     = {130--136},
+  pages     = {126--132},
   year      = {2015},
   editor    = {Huff, Kathryn and Bergstra, James},
   doi       = {10.25080/Majora-7b98e3ed-013}
@@ -149,63 +125,9 @@
   doi       = {10.1093/bioadv/vbaf167}
 }
 
-% [B] Peer-reviewed Parabricks benchmark on DGX infrastructure, relevant as a GPU-genomics performance baseline.
-@article{OConnell2023,
-  author    = {O'Connell, Kyle A. and Yosufzai, Zelaikha B. and Campbell, Ross A. and Lobb, Collin J. and Engelken, Haley T. and Gorrell, Laura M. and Carlson, Thad B. and Catana, Josh J. and Mikdadi, Dina and Bonazzi, Vivien R. and Klenk, Juergen A.},
-  title     = {Accelerating genomic workflows using {NVIDIA} {Parabricks}},
-  journal   = {BMC Bioinformatics},
-  year      = {2023},
-  volume    = {24},
-  number    = {1},
-  pages     = {221},
-  doi       = {10.1186/s12859-023-05292-2}
-}
-
-% [B] Large-scale scRNA-seq benchmark comparing frameworks on scalability and accuracy across dataset sizes.
-@article{Billato2025,
-  author    = {Billato, Ilaria and Pages, Herve and Carey, Vince and Waldron, Levi and Sales, Gabriele and Romualdi, Chiara and Risso, Davide},
-  title     = {Benchmarking large-scale single-cell {RNA}-seq analysis},
-  journal   = {bioRxiv},
-  year      = {2025},
-  doi       = {10.1101/2025.10.28.681564}
-}
-
-% [B] Multi-GPU NMF for genomics, demonstrating GPU scaling for large-scale matrix decomposition in bioinformatics.
-@article{MejiaRoa2015,
-  author    = {Mej{\'\i}a-Roa, Edgardo and Tabas-Madrid, Daniel and Setoain, Javier and Garc{\'\i}a, Carlos and Tirado, Francisco and Pascual-Montano, Alberto},
-  title     = {{NMF-mGPU}: non-negative matrix factorization on multi-{GPU} systems},
-  journal   = {BMC Bioinformatics},
-  year      = {2015},
-  volume    = {16},
-  pages     = {43},
-  doi       = {10.1186/s12859-015-0485-4}
-}
-
 % =============================================================================
 % CATEGORY C — Benchmark methodology
 % =============================================================================
-
-% [C] Authoritative guidelines for designing and reporting computational method benchmarks in bioinformatics.
-@article{Weber2019,
-  author    = {Weber, Lukas M. and Saelens, Wouter and Cannoodt, Robrecht and Soneson, Charlotte and Hapfelmeier, Alexander and Gardner, Paul P. and Boulesteix, Anne-Laure and Saeys, Yvan and Robinson, Mark D.},
-  title     = {Essential guidelines for computational method benchmarking},
-  journal   = {Genome Biology},
-  year      = {2019},
-  volume    = {20},
-  pages     = {125},
-  doi       = {10.1186/s13059-019-1738-8}
-}
-
-% [C] Framework for systematic benchmarking of omics tools, informing our experimental design and reporting.
-@article{Mangul2019,
-  author    = {Mangul, Serghei and Martin, Lana S. and Hill, Brian L. and Lam, Angela Ka-Mei and Distler, Margaret G. and Zelikovsky, Alex and Eskin, Eleazar and Flint, Jonathan},
-  title     = {Systematic benchmarking of omics computational tools},
-  journal   = {Nature Communications},
-  year      = {2019},
-  volume    = {10},
-  pages     = {1393},
-  doi       = {10.1038/s41467-019-09406-4}
-}
 
 % [C] Mixture-control benchmark establishing ground truth for evaluating scRNA-seq pipeline concordance.
 @article{Tian2019,
@@ -220,7 +142,7 @@
 
 % [C] Floating-point non-associativity in HPC reproducibility, directly relevant to GPU vs CPU numerical differences.
 @inproceedings{Shanmugavelu2024,
-  author    = {Shanmugavelu, Sanjif and Taillefumier, Mathieu and Thiele, Christopher and Coletti, Mark and Sedova, Ada},
+  author    = {Shanmugavelu, Sanjif and Taillefumier, Mathieu and Culver, Christopher and Hernandez, Oscar and Coletti, Mark and Sedova, Ada},
   title     = {Impacts of floating-point non-associativity on reproducibility for {HPC} and deep learning applications},
   booktitle = {Proceedings of the SC '24 Workshops of the International Conference on High Performance Computing, Networking, Storage, and Analysis (CORRECTNESS 2024)},
   year      = {2024},
@@ -229,7 +151,7 @@
 
 % [C] Foundational work on numerical reproducibility for parallel reductions on GPU/many-core architectures.
 @article{Collange2015,
-  author    = {Collange, Sylvain and Defour, David and Graillat, Stef and Iakymchuk, Roman},
+  author    = {Collange, Caroline and Defour, David and Graillat, Stef and Iakymchuk, Roman},
   title     = {Numerical reproducibility for the parallel reduction on multi- and many-core architectures},
   journal   = {Parallel Computing},
   year      = {2015},
@@ -284,18 +206,6 @@
   doi       = {10.12688/f1000research.15666.3}
 }
 
-% [C] Benchmark of clustering methods for high-dimensional single-cell data using external validation metrics.
-@article{Weber2016,
-  author    = {Weber, Lukas M. and Robinson, Mark D.},
-  title     = {Comparison of clustering methods for high-dimensional single-cell flow and mass cytometry data},
-  journal   = {Cytometry Part A},
-  year      = {2016},
-  volume    = {89},
-  number    = {12},
-  pages     = {1084--1096},
-  doi       = {10.1002/cyto.a.23030}
-}
-
 % =============================================================================
 % CATEGORY D — Scalability & HPC for genomics
 % =============================================================================
@@ -309,29 +219,6 @@
   volume    = {20},
   pages     = {228},
   doi       = {10.1186/s13059-019-1836-7}
-}
-
-% [D] Application of Dask for scalable transcriptomics, demonstrating distributed-memory frameworks for large omics data.
-@article{Moreno2022,
-  author    = {Moreno, Marta and Vila{\c{c}}a, Ricardo and Ferreira, Pedro G.},
-  title     = {Scalable transcriptomics analysis with {Dask}: applications in data science and machine learning},
-  journal   = {BMC Bioinformatics},
-  year      = {2022},
-  volume    = {23},
-  pages     = {514},
-  doi       = {10.1186/s12859-022-05065-3}
-}
-
-% [D] Roofline model characterisation of memory-bound vs compute-bound genomic sequence alignment on GPUs.
-@article{Lindegger2023,
-  author    = {Lindegger, Joel and Senol Cali, Damla and Alser, Mohammed and G{\'o}mez-Luna, Juan and Mansouri Ghiasi, Nika and Mutlu, Onur},
-  title     = {Scrooge: a fast and memory-frugal genomic sequence aligner for {CPUs}, {GPUs}, and {ASICs}},
-  journal   = {Bioinformatics},
-  year      = {2023},
-  volume    = {39},
-  number    = {5},
-  pages     = {btad151},
-  doi       = {10.1093/bioinformatics/btad151}
 }
 
 % [D] Foundational Roofline performance model used to characterise memory-bound and compute-bound behaviour.
@@ -420,18 +307,6 @@
   doi       = {10.1038/s41467-021-25960-2}
 }
 
-% [E] Original highly-variable-gene selection method underpinning feature-selection steps in both pipelines.
-@article{Brennecke2013,
-  author    = {Brennecke, Philip and Anders, Simon and Kim, Jong Kyoung and Ko{\l}odziejczyk, Aleksandra A. and Zhang, Xiuwei and Proserpio, Valentina and Baying, Bianka and Benes, Vladimir and Teichmann, Sarah A. and Marioni, John C. and Heisler, Marcus G.},
-  title     = {Accounting for technical noise in single-cell {RNA-seq} experiments},
-  journal   = {Nature Methods},
-  year      = {2013},
-  volume    = {10},
-  number    = {11},
-  pages     = {1093--1095},
-  doi       = {10.1038/nmeth.2645}
-}
-
 % [E] Systematic comparison of HVG-selection tools, contextualising method choices in our benchmark pipeline.
 @article{Yip2019,
   author    = {Yip, Shun H. and Sham, Pak Chung and Wang, Junwen},
@@ -444,18 +319,6 @@
   doi       = {10.1093/bib/bby011}
 }
 
-% [E] Comprehensive mouse nervous system atlas (~500K cells, 265 cell types), contextualising the Zheng mouse brain dataset.
-@article{Zeisel2018,
-  author    = {Zeisel, Amit and Hochgerner, Hannah and L{\"o}nnerberg, Peter and Johnsson, Anna and Memic, Fatima and van der Zwan, Job and H{\"a}ring, Martin and Braun, Emelie and Borm, Lars and La Manno, Gioele and Codeluppi, Simone and Furlan, Alessandro and Lee, Kawai and Skene, Nathan and Harris, Kenneth D. and Hjerling-Leffler, Jens and Arenas, Ernest and Ernfors, Patrik and Marklund, Ulrika and Linnarsson, Sten},
-  title     = {Molecular Architecture of the Mouse Nervous System},
-  journal   = {Cell},
-  year      = {2018},
-  volume    = {174},
-  number    = {4},
-  pages     = {999--1014.e22},
-  doi       = {10.1016/j.cell.2018.06.021}
-}
-
 % [E] Allen Brain Atlas whole-mouse-brain atlas (~7M cells), the largest mouse brain single-cell reference to date.
 @article{Yao2023,
   author    = {Yao, Zizhen and van Velthoven, Cindy T. J. and Kunst, Michael and Zhang, Meng and McMillen, Delissa and Lee, Changkyu and Jung, Won and Goldy, Jeff and Abdelhak, Aliya and others},
@@ -466,18 +329,6 @@
   number    = {7991},
   pages     = {317--332},
   doi       = {10.1038/s41586-023-06812-z}
-}
-
-% [E] Tabula Muris: foundational multi-organ mouse atlas providing biological context for mouse scRNA-seq benchmarks.
-@article{TabulaMuris2018,
-  author    = {{The Tabula Muris Consortium}},
-  title     = {Single-cell transcriptomics of 20 mouse organs creates a {Tabula Muris}},
-  journal   = {Nature},
-  year      = {2018},
-  volume    = {562},
-  number    = {7727},
-  pages     = {367--372},
-  doi       = {10.1038/s41586-018-0590-4}
 }
 
 % =============================================================================

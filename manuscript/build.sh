@@ -22,6 +22,7 @@ PANDOC_COMMON=(
     --from markdown+citations
     --citeproc
     --bibliography "${BIB}"
+    --csl "${SCRIPT_DIR}/csl/ieee.csl"
     --number-sections
     --standalone
     --resource-path "${SCRIPT_DIR}:${SCRIPT_DIR}/.."
@@ -31,6 +32,7 @@ build_docx() {
     echo "Building DOCX..."
     pandoc "${PANDOC_COMMON[@]}" \
         --to docx \
+        --reference-doc "${SCRIPT_DIR}/CIBB_2026_Microsoft_Word_Template_anomymous.docx" \
         --output "${OUTDIR}/manuscript.docx" \
         "${SRC}"
     echo "  -> ${OUTDIR}/manuscript.docx"
