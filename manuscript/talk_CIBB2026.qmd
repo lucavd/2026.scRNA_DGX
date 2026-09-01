@@ -3,7 +3,8 @@ title: "GPU-accelerated single-cell and spatial transcriptomics on NVIDIA DGX H1
 subtitle: "A systematic benchmark of speed, scalability, and biological concordance"
 author: "Luca Vedovelli, Corrado Lanera, Daniele Sabbatini, Dario Gregori"
 institute: "University of Padova · Pediatric Research Institute «Città della Speranza»"
-date: "CIBB 2026"
+date: "2026-09-02"
+date-format: "D/MM/YYYY"
 format:
   revealjs:
     theme: [default, custom.scss]
