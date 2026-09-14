@@ -39,7 +39,7 @@ resources:
 ::: notes
 Good morning. Single-cell RNA sequencing has become the workhorse for studying cellular heterogeneity, and datasets have exploded in size — a million cells is now routine, and spatial platforms like Visium HD push us into hundreds of thousands of measurement bins per tissue section.
 
-The problem is that the dominant analysis tools — Scanpy for single-cell, Squidpy for spatial — run on CPU. At atlas scale, a complete pipeline can take many hours, sometimes a full day. So the practical question we set out to answer is simple: can GPUs make this kind of analysis routine — and, crucially, can they do it without changing the biological conclusions we draw? That last part matters, because a fast wrong answer is worthless. Let me show you what we found.
+The problem is that the dominant tools, Scanpy and Squidpy, run on CPU, and at atlas scale a complete pipeline can take a full day. So our question was simple: can GPUs make this routine, and can they do it without changing the biological conclusions we draw? That last part matters, because a fast wrong answer is worthless.
 :::
 
 ## What we benchmarked
@@ -69,11 +69,11 @@ The problem is that the dominant analysis tools — Scanpy for single-cell, Squi
 :::
 
 ::: notes
-Here's the setup. For single-cell, we ran on a DGX H100 node — eight H100 GPUs, each with 80 gigabytes of memory, backed by 112 CPU cores and 2 terabytes of RAM. Spatial benchmarks ran on a more modest local workstation with a single consumer RTX 4090, to show the results aren't limited to elite hardware.
+Here's the setup. Single-cell ran on a DGX H100 node: eight H100s, 112 CPU cores, 2 terabytes of RAM. Spatial ran on a modest local workstation with a single consumer RTX 4090, to show the results aren't limited to elite hardware.
 
 On the software side we compared Scanpy on CPU, using all 100 threads, against rapids-singlecell on GPU — that's a near drop-in replacement built on the RAPIDS ecosystem. Everything ran inside Singularity containers built from a fixed NVIDIA base image, so the whole thing is reproducible.
 
-We asked five questions, and they organise the rest of the talk: how big is the speedup, both per-step and end-to-end; how well does it scale across multiple GPUs; do CPU and GPU give the same biology; how many cells can we push through a single node; and does any of this carry over to spatial transcriptomics. Let's take them in turn.
+Five questions organise the rest of the talk, and they are on the slide: speedup, multi-GPU scaling, biological concordance, maximum capacity, and whether any of it carries over to spatial. Let's take them in turn.
 :::
 
 ## The pipeline is identical on both sides
@@ -84,7 +84,7 @@ We asked five questions, and they organise the rest of the talk: how big is the 
 - Concordance measured directly: HVG Jaccard, PCA correlation, ARI/NMI, DE log-fold-change
 
 ::: notes
-A benchmark is only fair if both pipelines do exactly the same work, so we were strict about that. Same input — the 10x Genomics 1.3-million mouse brain dataset, uniformly subsampled to five sizes from ten thousand up to the full 1.3 million. Same parameters at every step: quality control, library-size normalisation, two thousand highly variable genes, fifty principal components, a k-nearest-neighbour graph with k of fifteen, Leiden clustering, UMAP, and Wilcoxon differential expression. Same random seed, and five independent repeats of every configuration so we have error bars, not single runs.
+A benchmark is only fair if both pipelines do exactly the same work, so we were strict. Same input, the 10x 1.3-million mouse brain dataset, subsampled to five sizes. Same parameters at every step, as listed here. Same seed, and five independent repeats of every configuration, so we have error bars rather than single runs.
 
 And rather than just assuming the outputs match, we measured concordance directly at each stage — gene-selection overlap, PCA correlation, clustering agreement, and differential-expression correlation. Those numbers come back later in the talk.
 :::
@@ -94,9 +94,9 @@ And rather than just assuming the outputs match, we measured concordance directl
 ![Per-step speedup of single-GPU rapids-singlecell vs CPU Scanpy. Normalisation reaches 329×; data loading is the one place CPU wins (fixed CUDA startup cost).](../figures/fig1_speedup_heatmap.png){width="62%"}
 
 ::: notes
-This is the headline. At the full 1.3 million cells, the eight-GPU pipeline finished the entire analysis in 435 seconds — just over seven minutes — versus 52,000 seconds on CPU, which is fourteen and a half hours. That's a 120-fold speedup. A analysis you'd start and leave overnight now finishes before your coffee is cold.
+What is on the screen is the per-step picture: a single GPU against CPU Scanpy, at ten, fifty and a hundred thousand cells. The speedups are wildly uneven, spanning two orders of magnitude. Normalisation, trivially parallel element-wise arithmetic, hits 329-fold at ten thousand cells. Neighbours and UMAP are in the tens. And notice the one place where CPU wins: data loading, at the far left, because the GPU pays a fixed cost to initialise its CUDA context. So the profile of your pipeline decides what you actually get out of a GPU.
 
-But the interesting story is in this heatmap, which breaks it down step by step. The speedups are wildly uneven — they span two orders of magnitude. Normalisation, which is trivially parallel element-wise arithmetic, hits 329-fold. Neighbour-graph construction and UMAP are in the tens-of-times range. And notice the one place where CPU actually wins: data loading, at the far left, is slightly faster on CPU because the GPU pays a fixed cost to initialise its CUDA context. So the GPU isn't uniformly faster — it's dramatically faster where the work is parallel, and the profile of your pipeline determines what you actually get.
+The number in the title is a different measurement, so let me be explicit about it. The 120-fold is end to end on the full 1.3 million cells with eight GPUs: 435 seconds against fourteen and a half hours on CPU. There are no per-step single-GPU numbers above a hundred thousand cells, because from 500k upwards the standard pipeline no longer fits in one H100. That constraint comes back two slides from now.
 :::
 
 ## Where the time goes {.smaller}
@@ -104,9 +104,9 @@ But the interesting story is in this heatmap, which breaks it down step by step.
 ![Step-level wall-time on CPU vs single GPU. On CPU, differential expression and neighbours dominate; on GPU, every step collapses to seconds.](../figures/fig5_timing_breakdown.png){width="70%"}
 
 ::: notes
-Here's the same result seen as absolute wall time rather than ratios, and it makes the bottleneck obvious. On the CPU side — the tall bars — two steps eat almost all the time: differential expression testing and neighbour-graph construction. On the GPU side, everything collapses down to seconds; you can barely see the individual steps.
+Same result as absolute wall time rather than ratios, and the bottleneck becomes obvious. On CPU, the tall bars, two steps eat almost all the time: differential expression and neighbour-graph construction. On GPU everything collapses to seconds.
 
-This is why the per-step view matters. If you only accelerate the cheap steps, you save nothing. The value of the GPU here is that it crushes exactly the two operations that dominated the CPU runtime. That's the difference between a marketing speedup and a useful one.
+This is why the per-step view matters. If you only accelerate the cheap steps you save nothing. The value here is that the GPU crushes exactly the two operations that dominated CPU runtime.
 :::
 
 ## More GPUs help less than you'd hope {.smaller}
@@ -124,9 +124,9 @@ This is why the per-step view matters. If you only accelerate the cheap steps, y
 :::
 
 ::: notes
-Now a result that surprised us, and that has real practical consequences. You might expect that if two GPUs are good, eight are four times better. They're not. Look at these curves — beyond two GPUs they're almost flat. At 1.3 million cells, eight GPUs were only twelve percent faster than two.
+Now a result that surprised us. You might expect that if two GPUs are good, eight are four times better. They're not. Beyond two GPUs these curves are almost flat: at 1.3 million cells, eight GPUs were only twelve percent faster than two. And to be clear before I explain it, this does not undercut the headline. The 120-fold comes from moving to GPU at all, not from having eight of them: two GPUs already give 105-fold at 1.3 million cells, and the other six buy thirteen percent.
 
-Why? Because when we profiled an eight-GPU run, seventy-five percent of the wall time was CPU-side preprocessing — loading, filtering, normalising — which doesn't touch the GPUs at all. Only four percent of the time was in the part that actually benefits from more GPUs, the distributed PCA and neighbours. This is textbook Amdahl's law: your speedup is capped by the part you didn't parallelise. The preprocessing is the anchor.
+Why? Because when we profiled an eight-GPU run, seventy-five percent of the wall time was preprocessing running on the host CPU: loading, filtering, normalising, HVG selection. That sounds like it contradicts the heatmap I showed earlier, so let me be precise. At 500k and 1.3 million cells the data no longer fits in the 80 gigabytes of a single H100, so the multi-GPU Dask path was the only way to run at all. And in that path, only PCA and the neighbour graph had distributed implementations; the preprocessing steps had no multi-GPU route, so they fell back to the host. Normalisation is still 329-fold faster on one GPU. This is a limit of the software stack, not of the operation. Only four percent of the time was in the part that actually benefits from more GPUs, the distributed PCA and neighbours. This is textbook Amdahl's law: your speedup is capped by the part you didn't parallelise. The preprocessing is the anchor.
 :::
 
 ## So use the node differently
@@ -141,9 +141,9 @@ A DGX node is better used as **eight independent single-GPU workers** running ei
 - GPU acceleration is **accessible**, not just for those with a DGX
 
 ::: notes
-The scaling result flips into a useful piece of advice. If adding GPUs to one job barely helps, then the efficient way to use an eight-GPU node is not to throw all eight at a single analysis — it's to run eight separate analyses, one per GPU, in parallel. You get eight times the throughput instead of twelve percent off one job.
+That flips into a useful piece of advice. If adding GPUs to one job barely helps, the efficient way to use an eight-GPU node is to run eight separate analyses, one per GPU, in parallel. Eight times the throughput instead of twelve percent off one job.
 
-And the deeper point is about accessibility. Because nearly all the benefit lives on a single GPU, you don't need a half-million-dollar DGX to get it. A single H100 rented in the cloud for two to four dollars an hour gives you almost the entire speedup. This democratises atlas-scale analysis — it's not gated behind owning big iron.
+And because nearly all the benefit lives on a single GPU, you don't need a DGX. A cloud H100 at two to four dollars an hour gives you almost the entire speedup.
 :::
 
 ## The biology is preserved {.smaller}
@@ -165,7 +165,7 @@ And the deeper point is about accessibility. Because nearly all the benefit live
 ::: notes
 This is the slide that makes the speed meaningful. A faster pipeline is only useful if it gives you the same answer, so we compared the outputs directly.
 
-The gene selection was identical — a Jaccard index of exactly one, the same two thousand genes. The PCA loadings correlated perfectly. Leiden clustering agreement was between 0.91 and 0.96 on the adjusted Rand index, with normalised mutual information above 0.95. And the differential-expression fold-changes correlated at 0.95. The small residual differences aren't errors — they come from GPU floating-point non-determinism and from stochastic steps like Leiden and UMAP, and they're well within the range you'd see just re-running the CPU pipeline with a different seed. So the message is clean: the GPU gives you the same biology, an order of magnitude or two faster.
+Gene selection was identical, a Jaccard index of exactly one. PCA loadings correlated perfectly. Leiden agreement was 0.91 to 0.96 on the adjusted Rand index, and differential-expression fold-changes correlated at 0.95. The small residual differences come from GPU floating-point non-determinism and from stochastic steps like Leiden and UMAP, well within what you would see re-running the CPU pipeline with a different seed. Same biology, one to two orders of magnitude faster.
 :::
 
 ## How far can one node go? {.smaller}
@@ -185,7 +185,9 @@ The gene selection was identical — a Jaccard index of exactly one, the same tw
 ::: notes
 Next we pushed a memory-optimised version of the pipeline to find the breaking point on a single node. It succeeded at 11.9 million cells — 119 minutes — and failed at twelve million, when Leiden clustering ran out of memory.
 
-But here's the counterintuitive part, shown in this memory profile. The thing that ran out was not GPU memory. Aggregate VRAM across all eight GPUs stayed flat and low — only 7.6 percent of the 640 gigabytes available. The binding constraint was CPU RAM, which peaked at 535 gigabytes during preprocessing. So the message for anyone planning a large run: to go bigger, you need more system RAM, not more or bigger GPUs. That reframes how you'd spec a machine for this work.
+But here's the counterintuitive part, shown in this memory profile. The thing that ran out was not GPU memory. Aggregate VRAM across all eight GPUs stayed flat and low, only 7.6 percent of the 640 gigabytes available. The wall is on the CPU side.
+
+One honest caveat on that 535 gigabyte figure, because it invites the obvious question. That is not the memory the job was using when it died. It is the resident memory of the parent process, sampled between one step and the next, while eight Dask workers ran that the sampler never saw and the scheduler did count. The trace even contains a three hundred gigabyte jump that belongs to no measured step. So our working hypothesis is short-lived allocations inside Scanpy's preprocessing, above all the duplicate raw matrix its differential expression backend requires. What we can rule out is clustering: Leiden runs on the GPU here and added under a gigabyte of host memory. The headline holds either way, and it is the useful part: the ceiling sits on the CPU side while GPU memory stays nearly empty. Buy system RAM, not more GPUs.
 :::
 
 ## Differential expression: pseudo-bulk wins twice {.smaller}
@@ -222,7 +224,9 @@ And the beautiful thing is that pseudo-bulk isn't a speed-versus-correctness tra
 ::: notes
 Finally, does this carry beyond single-cell? We ran the same kind of benchmark on spatial transcriptomics — three 10x Visium platforms — and on the modest RTX 4090, not the DGX.
 
-End-to-end we saw up to 51-fold speedup on the high-resolution Visium HD data. And one operation stood out: co-occurrence analysis, which is an order-n-squared computation on CPU, sped up by a factor of 3,272 when parallelised across GPU threads. That's the kind of quadratic operation GPUs were made for. Concordance was again essentially perfect — the spatial autocorrelation statistics, Moran's I and Geary's C, correlated at 0.9995 or better. One honest caveat: clustering agreement diverged on the very highest-resolution data, because the CPU and GPU Leiden implementations break near-degenerate partitions differently — that's a known algorithmic difference, and it's in the paper.
+End-to-end, up to 51-fold on the high-resolution Visium HD data. One operation stood out: co-occurrence analysis, order-n-squared on CPU, sped up by a factor of 3,272. That's the kind of quadratic work GPUs were made for. Concordance was again essentially perfect: Moran's I and Geary's C correlated at 0.9995 or better. One honest caveat: clustering agreement diverged on the highest-resolution data, because the CPU and GPU Leiden implementations break near-degenerate partitions differently. It's in the paper.
+
+A word on why the RTX 4090 rather than the DGX, because it is a fair question. The cluster runs driver 535, which caps the CUDA runtime at 12.2. The single-cell pipeline ran there fine through forward compatibility, but the GPU components of the spatial stack did not, and when we tried to downgrade the container to an older RAPIDS release the spatial dependencies, Squidpy's GPU backend and spatialdata, could not be resolved at all. That is not a dig at our sysadmins: a shared production node cannot chase driver releases that break half the Python stack for everyone else on it, so updating conservatively is the right call. It is a real constraint of this software on shared infrastructure, and it is worth naming, because right now a consumer workstation can be the more practical place to run a GPU spatial pipeline than the cluster.
 :::
 
 ## Takeaways {background-color="#0b3d63" background-opacity="0.06"}
@@ -238,7 +242,7 @@ Code, containers, and all benchmark data: **github.com/lucavd/2026.scRNA_DGX**
 :::
 
 ::: notes
-Let me pull it together into five things to remember. One: GPU acceleration gives up to a 120-fold end-to-end speedup with biologically concordant results — same answer, dramatically faster. Two: the bottleneck is CPU-side preprocessing, not GPU compute, which is why most of the value is on a single GPU and why multi-GPU scaling is disappointing. Three: the ceiling on how big you can go is CPU RAM, not GPU memory — we hit 11.9 million cells on one node. Four: for differential expression, pseudo-bulk is both the fastest and the most statistically correct choice. And five: it all generalises to spatial transcriptomics, over 50-fold, even on a consumer graphics card.
+Five things to remember. One: up to a 120-fold end-to-end speedup with biologically concordant results. Two: the bottleneck is CPU-side preprocessing, not GPU compute, which is why most of the value sits on a single GPU. Three: the ceiling is CPU RAM, not GPU memory; we reached 11.9 million cells on one node. Four: for differential expression, pseudo-bulk is both the fastest and the most statistically correct choice. Five: it generalises to spatial, over 50-fold, on a consumer card.
 
 Everything — the code, the Singularity containers, and every benchmark JSON — is public on GitHub. Thank you, and I'm happy to take questions.
 :::
