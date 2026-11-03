@@ -1,5 +1,11 @@
 # Registro
 
+## 2026-11-04
+
+- [nuovo riferimento spatial (S1)](steps/S1.md) chiuso: il PI ha letto il riassunto senza dubbi nuovi (approvazione nel file dello step).
+
+- [piano di implementazione (S2)](steps/S2.md): attese pre-registrate (5 cancelli, 3 previsioni, criterio della convenzione sulle ripetizioni fissato prima di vederne le conseguenze); aggiunto `tools/check_manifest.py`, che confronta i risultati grezzi con il manifest md5.
+
 ## 2026-11-03
 
 - [nuovo riferimento spatial (S1)](steps/S1.md): registrata [Co-occorrenza GPU: difetto riportato, esclusa dagli speedup a HD, verifica con rapids-singlecell 0.15.1 (D-13)](decisions/D-13.md); verifica con rapids-singlecell 0.15.1 fatta a server libero (19:31-19:36): co-occorrenza GPU uguale alla CPU su 49 distanze su 49, tempo invariato; report aggiornato; riassunto finale al PI.
