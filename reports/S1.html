@@ -3059,6 +3059,7 @@ vertical-align: -.125em;
   <li><a href="#tempi-totali-e-speedup" id="toc-tempi-totali-e-speedup" class="nav-link" data-scroll-target="#tempi-totali-e-speedup">Tempi totali e speedup</a></li>
   <li><a href="#visium-hd-8-µm-step-per-step" id="toc-visium-hd-8-µm-step-per-step" class="nav-link" data-scroll-target="#visium-hd-8-µm-step-per-step">Visium HD 8 µm step per step</a></li>
   <li><a href="#concordanza-cpu-gpu" id="toc-concordanza-cpu-gpu" class="nav-link" data-scroll-target="#concordanza-cpu-gpu">Concordanza CPU-GPU</a></li>
+  <li><a href="#verifica-della-co-occorrenza-con-rapids-singlecell-0.15.1" id="toc-verifica-della-co-occorrenza-con-rapids-singlecell-0.15.1" class="nav-link" data-scroll-target="#verifica-della-co-occorrenza-con-rapids-singlecell-0.15.1">Verifica della co-occorrenza con rapids-singlecell 0.15.1</a></li>
   <li><a href="#cosa-è-girato" id="toc-cosa-è-girato" class="nav-link" data-scroll-target="#cosa-è-girato">Cosa è girato</a></li>
   <li><a href="#appendice-da-dove-vengono-i-numeri-del-riassunto" id="toc-appendice-da-dove-vengono-i-numeri-del-riassunto" class="nav-link" data-scroll-target="#appendice-da-dove-vengono-i-numeri-del-riassunto">Appendice: da dove vengono i numeri del riassunto</a></li>
   </ul>
@@ -3093,27 +3094,19 @@ vertical-align: -.125em;
 <ol type="1">
 <li><strong>Il rallentamento della CPU a marzo era un difetto di Squidpy, non del calcolo.</strong> Dopo l’arricchimento di vicinato, Squidpy lascia numba a un solo thread per il resto del processo: lo abbiamo verificato (da 100 thread a 1). Con un processo per ripetizione, la co-occorrenza CPU a Visium HD 8 µm dura 103 s in ogni ripetizione sul DGX e 72 s sul server, invece di circa 3.570 s.</li>
 <li><strong>Lo speedup a Visium HD 8 µm scende da 51,6x a 7,8x.</strong> La CPU del DGX impiega 719 s e la GPU 92 s; con la CPU del server lo speedup è 6,7x. Sul Visium v1 lo speedup è 1,4x (1,6x con il server), sul Visium HD 2 µm è 10,4x (9,4x). Contare o escludere la prima ripetizione ora dà lo stesso valore.</li>
-<li><strong>La GPU sbaglia la co-occorrenza a Visium HD 8 µm, e la sbagliava già a marzo.</strong> Con gli stessi gruppi, il risultato GPU coincide con quello CPU solo sulle prime 8 delle 49 distanze. Oltre quel punto il numero di coppie di bin supera il limite degli interi a 32 bit usati da rapids-singlecell 0.14.1. Il difetto è corretto nella versione 0.15.1, di maggio 2026. Sul Visium v1, più piccolo, CPU e GPU coincidono.</li>
+<li><strong>La GPU sbagliava la co-occorrenza a Visium HD 8 µm, anche a marzo; la versione corretta di rapids-singlecell la calcola giusta nello stesso tempo.</strong> Con la versione 0.14.1 il risultato GPU coincide con quello CPU solo su 8 delle 49 distanze, perché il numero di coppie di bin supera il limite degli interi a 32 bit. Con la versione 0.15.1 coincide su tutte le 49 (differenza massima 0,0002), e il tempo resta lo stesso (rapporto 0,98).</li>
 <li><strong>Lo speedup dipende dalla CPU di riferimento, dal 10% al 14%, in direzioni diverse.</strong> Sul Visium v1 la CPU del DGX è più veloce di quella del server. A Visium HD è più lenta: perde negli step che usano numba (Moran, Geary, co-occorrenza, UMAP) e guadagna nella PCA.</li>
 <li><strong>Il resto regge.</strong> Il cambio di driver della scheda video non ha effetto: i tempi GPU degli step che non dipendono dai gruppi restano entro il 6% di marzo. Il controllo CPU sul server riproduce la prima ripetizione di marzo entro il 6%. I risultati originali sono intatti, e durante le misure non girava nessun altro calcolo.</li>
 </ol>
-<p><strong>Cosa devi decidere.</strong></p>
-<ol type="1">
-<li><strong>Come trattiamo la co-occorrenza GPU nel capitolo? Consiglio di riportare il difetto come risultato, togliere la co-occorrenza dagli speedup a Visium HD 8 µm e fare una verifica di circa 20 minuti a server libero con la versione corretta di rapids-singlecell.</strong> La verifica rifà solo la co-occorrenza GPU sugli stessi gruppi. Mostra se la correzione rende il risultato uguale a quello CPU e quanto tempo richiede. Senza la co-occorrenza, lo speedup end-to-end a Visium HD 8 µm è 6,9x (6,1x con la CPU del server).
-<ul>
-<li>Riportare il difetto e togliere la co-occorrenza, senza verifica: nessun calcolo in più, ma il capitolo citerebbe una correzione che non abbiamo provato.</li>
-<li>Rifare tutta la pipeline GPU spatial con la versione 0.15.1: tutti i tempi GPU vengono dal software corretto, ma la parte spatial userebbe una versione diversa dallo scRNA e il confronto con marzo sul driver non varrebbe più. Serve circa 1 ora a server libero.</li>
-</ul></li>
-</ol>
 <p><strong>Comunque.</strong></p>
 <ul>
+<li>Come hai deciso, a Visium HD 8 µm la co-occorrenza esce dagli speedup: senza di essa lo speedup end-to-end è 6,9x (6,1x con la CPU del server). Il difetto si riporta come risultato, insieme alla verifica sulla versione corretta.</li>
 <li>Nel capitolo la CPU di riferimento resta il DGX, e il server compare come controllo insieme alla differenza che produce.</li>
 <li>Nei Metodi correggeremo tre cose: il dataset Visium HD è il “Tiny 3’” di 10x e non l’FFPE; la workstation ha 128 thread; il driver della scheda video è cambiato. Diremo anche che ogni ripetizione è un processo nuovo, che quindi include la compilazione iniziale.</li>
 <li>Il piano delle correzioni terrà conto di due cose: per lo spatial la scelta sulla prima ripetizione non cambia più nulla; i run CPU dello scRNA, fatti anch’essi in un unico processo, vanno controllati per lo stesso difetto dei thread.</li>
 <li>Quando integreremo i risultati spatial nel testo terremo conto che i gruppi di Leiden cambiano con la macchina: a Visium HD 8 µm sono 4 sul DGX, 7 sul server e 3 o 4 sulla GPU.</li>
 </ul>
-<p>Appena decidi questo punto, lo step è chiuso.</p>
-<p><strong>Sui tempi di calcolo.</strong> Le stime vengono dai run GPU di oggi. Una ripetizione GPU completa a Visium HD 8 µm, avvio del container compreso, è durata circa 2,3 minuti. La verifica ne fa 5 con la sola co-occorrenza, più la preparazione dell’immagine con la nuova versione: circa 20 minuti. Le 15 ripetizioni GPU complete hanno richiesto oggi 28 minuti; l’ora della terza opzione aggiunge la preparazione dell’immagine, i controlli di macchina libera e i confronti.</p>
+<p>Non c’è nulla da decidere: se non hai dubbi, lo step è chiuso.</p>
 </section>
 <section id="dubbi-rinviati" class="level1">
 <h1>Dubbi rinviati</h1>
@@ -3546,6 +3539,65 @@ vertical-align: -.125em;
 </table>
 <p><strong>Co-occorrenza a HD 8 µm.</strong> Con gli stessi 4 gruppi la matrice GPU coincide con la CPU sulle prime 8 delle 49 distanze e differisce sulle altre 41 (massima differenza 61,5). I contatori di rapids-singlecell 0.14.1 sono interi a 32 bit; le coppie ordinate di bin entro la soglia superano 2^31 dalla soglia 6 e 2^32 dalla soglia 8 (4,52 miliardi). Le matrici GPU di marzo a HD 8 µm hanno le stesse 17 distanze tutte a zero. La versione 0.15.1 di rapids-singlecell (20 maggio 2026) dichiara corretto l’overflow.</p>
 </section>
+<section id="verifica-della-co-occorrenza-con-rapids-singlecell-0.15.1" class="level1">
+<h1>Verifica della co-occorrenza con rapids-singlecell 0.15.1</h1>
+<p>Decisione del PI del 3 novembre (D-13). Attese pre-registrate nel commit 9afea35, prima del run. Stessa pipeline fino ai gruppi, poi la sola co-occorrenza GPU, una ripetizione per processo; immagine derivata che cambia solo rapids-singlecell (<code>pip freeze</code>: <code>rapids_singlecell==0.14.1</code> sostituito da <code>rapids-singlecell-cu12==0.15.1</code>; id <code>sha256:4fbe1a15d8e2...</code>). Run dalle 19:31 alle 19:36, load1 massimo 0,87.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>id</th>
+<th>atteso</th>
+<th>osservato</th>
+<th>esito</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>V1 immagine derivata</td>
+<td>solo rapids-singlecell diverso</td>
+<td>solo rapids-singlecell diverso</td>
+<td>superato</td>
+</tr>
+<tr class="even">
+<td>V2 macchina libera</td>
+<td>load1 ≤ 3</td>
+<td>massimo 0,87</td>
+<td>superato</td>
+</tr>
+<tr class="odd">
+<td>V3 0.14.1 come la pipeline</td>
+<td>identica</td>
+<td>identica bit per bit, 5 su 5 (8 distanze su 49 uguali alla CPU)</td>
+<td>superato</td>
+</tr>
+<tr class="even">
+<td>Q1 0.15.1, HD 8 µm</td>
+<td>49 su 49</td>
+<td>49 su 49, 5 su 5; differenza massima 0,00022</td>
+<td>confermata</td>
+</tr>
+<tr class="odd">
+<td>Q2 0.15.1, Visium v1</td>
+<td>49 su 49</td>
+<td>49 su 49, 5 su 5; differenza massima 1e-5</td>
+<td>confermata</td>
+</tr>
+<tr class="even">
+<td>Q3 tempo 0.15.1 / 0.14.1</td>
+<td>1 (0,9-1,1)</td>
+<td>0,983 [0,951; 1,004]</td>
+<td>confermata</td>
+</tr>
+</tbody>
+</table>
+<p>Nella verifica la sola co-occorrenza GPU a HD 8 µm dura 4,41 s con 0.15.1 e 4,49 s con 0.14.1; dentro la pipeline la stessa chiamata con 0.14.1 durava 2,55 s, perché le librerie CUDA erano già caricate dagli step precedenti. Il rapporto Q3 dice che la correzione non cambia il tempo. Per la decisione del PI la co-occorrenza resta comunque fuori dagli speedup a Visium HD.</p>
+</section>
 <section id="cosa-è-girato" class="level1">
 <h1>Cosa è girato</h1>
 <ul>
@@ -3553,6 +3605,7 @@ vertical-align: -.125em;
 <li>Immagine: <code>lucavd/sc-benchmark-spatial:latest</code>, id <code>sha256:738c8cc7301590c95a3ddc3b7dd74bafeefee1f1ce188063e14a166a707a6ddd</code>; SIF sul DGX sha256 <code>9f80e5134b74d4fd3c1ca142c9462d7908bdea0129b2c4779dd998d6b252eff8</code>.</li>
 <li>DGX: job SLURM 425527 su <code>poddgx02</code>, esclusivo, 2 h 44 min 37 s (13:27-16:12), 15 passi da 100 CPU più la prova del meccanismo.</li>
 <li>Server: finestra dalle 14:07 alle 18:19 (prova termica, attesa dei gruppi dal DGX fino alle 14:53, GPU fino alle 15:21, controllo CPU fino alle 18:18, confronti).</li>
+<li>Verifica della co-occorrenza: commit 0dcd091 del ramo (script <code>s1_cooc_check.py</code>, <code>s1_cooc_check_eval.py</code>, <code>run_cooc_check_s1.sh</code>, <code>Dockerfile.spatial_rsc0151</code>); risultato <code>SPATIAL/results_v2/cooc_check/cooc_check_eval.json</code> (md5 eeba7c21549c8769725720b638777329).</li>
 <li>Dati: 25 file letti, md5 identici su server e DGX.</li>
 <li>Integrità: <code>SPATIAL/results_v2/integrity/</code> (manifest dei grezzi, 921 file, 0 differenze prima e dopo).</li>
 <li>md5 dei file di risultato usati qui: <code>s1_evaluation.json</code> 16ef576748159a31e124b83b96773efd; <code>s1_step_stats.csv</code> 87d55545171f96d8e63be81291f1f1c7; <code>s1_speedups.csv</code> ab1db1bab958d393cb92fbdd0c070d0e; <code>s1_extra_numbers.json</code> bbacec7315ae5e9d5676a9d5d00f65c0; <code>mechanism_dgx/mechanism_numba_threads.json</code> 14ce47470efd9a96e2aab25f856cd894; <code>thermal/thermal_eval.json</code> 3be5130776e66d64dd1a2fca9e6e983a; <code>concordance_reference/spatial_concordance_visium_hd_square_008um.json</code> 8650ebd9c6deed060161f2e5dc9f500b; <code>integrity/G1_raw_results_md5_after.json</code> a08774ee7d1fc65196f43fb3ed74f675.</li>
@@ -3611,8 +3664,18 @@ vertical-align: -.125em;
 </tr>
 <tr class="even">
 <td>limite degli interi a 32 bit</td>
-<td><code>s1_cooc_overflow_check.py</code>: coppie entro la soglia 8</td>
+<td><code>s1_cooc_overflow_check.json</code>: coppie entro la soglia 8</td>
 <td>4.516.749.851</td>
+</tr>
+<tr class="odd">
+<td>49 distanze su 49, differenza 0,0002</td>
+<td><code>cooc_check/cooc_check_eval.json</code>, <code>Q1_hd8_rsc0151_equal_intervals</code>, <code>Q1_hd8_rsc0151_max_abs_diff</code></td>
+<td>49 (5 su 5); 0,00022</td>
+</tr>
+<tr class="even">
+<td>rapporto 0,98</td>
+<td><code>cooc_check/cooc_check_eval.json</code>, <code>Q3_ratio</code></td>
+<td>0,983</td>
 </tr>
 <tr class="odd">
 <td>dal 10% al 14%</td>
@@ -3638,11 +3701,6 @@ vertical-align: -.125em;
 <td>4, 7, 3 o 4 gruppi</td>
 <td><code>s1_extra_numbers.json</code>, <code>own_leiden_clusters</code> HD 8 µm</td>
 <td>4; 7; 3,4,3,3,3</td>
-</tr>
-<tr class="even">
-<td>2,3 minuti; 28 minuti</td>
-<td><code>window.log</code>: wall delle ripetizioni GPU HD 8 µm; gpu start 14:53:17, cpu start 15:21:26</td>
-<td>136-145 s; 28 min</td>
 </tr>
 </tbody>
 </table>
