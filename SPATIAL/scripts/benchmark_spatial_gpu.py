@@ -47,6 +47,11 @@ import squidpy as sq
 
 import rapids_singlecell as rsc
 
+import spatial_run_meta as srm
+
+# Thread/host recorder for the current repetition (set in run_pipeline)
+_REC: srm.StepRecorder | None = None
+
 
 # Fixed random seed
 RANDOM_SEED = 42
@@ -106,6 +111,8 @@ def time_step(
     Returns:
         Whatever func() returns.
     """
+    if _REC is not None:
+        _REC.before(name)
     gc.collect()
     cp.get_default_memory_pool().free_all_blocks()
 
@@ -122,6 +129,8 @@ def time_step(
 
     ram_after = get_peak_ram_gb()
     vram_after = get_vram_used_gb(device_index)
+    if _REC is not None:
+        _REC.after(name)
 
     timings[name] = round(elapsed, 4)
     memory[f"{name}_ram_before_gb"] = round(ram_before, 2)
@@ -257,6 +266,7 @@ def run_pipeline(
     device_index: int = 0,
     bin_size: str = "square_008um",
     max_spots: int | None = None,
+    labels_from: str | None = None,
 ) -> tuple[dict, sc.AnnData]:
     """Run the GPU spatial pipeline with timing.
 
@@ -273,8 +283,12 @@ def run_pipeline(
     Returns:
         Tuple of (result dict, processed AnnData on CPU).
     """
+    global _REC
     timings: dict[str, float] = {}
     memory: dict[str, float] = {}
+    _REC = srm.StepRecorder()
+    host_start = srm.host_snapshot()
+    threads_start = srm.thread_snapshot()
 
     label = f"{platform}" if platform == "visium" else f"{platform} ({bin_size})"
     print(f"\n{'=' * 80}")
@@ -407,6 +421,20 @@ def run_pipeline(
     n_clusters = len(np.unique(np.asarray(labels)))
     print(f"    Leiden clusters: {n_clusters} (resolution={leiden_res})")
 
+    # Groups for co-occurrence, nhood enrichment and ligrec (not timed).
+    # With --labels-from, CPU and GPU use the same groups read from file;
+    # Leiden above is still run and timed as before.
+    if labels_from is not None:
+        groups, groups_info = srm.load_groups(labels_from, adata.obs_names)
+        adata.obs["spatial_groups"] = groups
+        group_key = "spatial_groups"
+    else:
+        group_key = "leiden_1.0"
+        groups_info = {"labels_file": None, "n_groups_used": n_clusters}
+    n_groups = int(groups_info["n_groups_used"])
+    groups_info["group_key"] = group_key
+    print(f"    Groups for spatial steps: {n_groups} (key={group_key})")
+
     # -- Phase B: Spatial-specific analysis -----------------------------------
 
     print(f"\n  {'--- SPATIAL STEPS ---':^70}")
@@ -464,36 +492,36 @@ def run_pipeline(
 
     # 12. Co-occurrence (GPU) -- skip if too many clusters (O(k^2) memory)
     rsc.get.anndata_to_CPU(adata)
-    if n_clusters <= 500:
+    if n_groups <= 500:
         time_step(
             "co_occurrence",
-            lambda: rsc.gr.co_occurrence(adata, cluster_key="leiden_1.0"),
+            lambda: rsc.gr.co_occurrence(adata, cluster_key=group_key),
             timings, memory, device_index,
         )
     else:
-        print(f"  co_occurrence: SKIPPED -- {n_clusters} clusters (>500)")
+        print(f"  co_occurrence: SKIPPED -- {n_groups} groups (>500)")
         timings["co_occurrence"] = -1
 
     # 13. Neighborhood enrichment (CPU only) -- skip if too many clusters
-    if n_clusters <= 500:
+    if n_groups <= 500:
         time_step(
             "nhood_enrichment",
-            lambda: sq.gr.nhood_enrichment(adata, cluster_key="leiden_1.0"),
+            lambda: sq.gr.nhood_enrichment(adata, cluster_key=group_key),
             timings, memory, device_index,
         )
     else:
-        print(f"  nhood_enrichment: SKIPPED -- {n_clusters} clusters (>500)")
+        print(f"  nhood_enrichment: SKIPPED -- {n_groups} groups (>500)")
         timings["nhood_enrichment"] = -1
 
     # 14. Ligand-receptor interaction (CPU -- Squidpy)
     # Skip at large scale (>100k spots) -- very slow and not informative
-    if n_after_qc <= 100_000 and n_clusters <= 500:
+    if n_after_qc <= 100_000 and n_groups <= 500:
         try:
             time_step(
                 "ligrec",
                 lambda: sq.gr.ligrec(
                     adata,
-                    cluster_key="leiden_1.0",
+                    cluster_key=group_key,
                     use_raw=False,
                     n_perms=100,
                     transmitter_params={"categories": "ligand"},
@@ -550,7 +578,15 @@ def run_pipeline(
                 "cupy": cp.__version__,
                 "python": sys.version,
                 "numpy": np.__version__,
+                "numba": pkg_version("numba"),
+                "threadpoolctl": pkg_version("threadpoolctl"),
             },
+            "system": srm.system_info(None),
+            "threads_at_start": threads_start,
+            "host_start": host_start,
+            "host_end": srm.host_snapshot(),
+            "steps_runtime": _REC.steps,
+            "groups": groups_info,
             "spatial_gpu_coverage": {
                 "expression_steps": "gpu (rsc)",
                 "spatial_neighbors": "cpu_only (squidpy)",
@@ -572,6 +608,7 @@ def run_pipeline(
             "n_hvgs": n_hvgs,
             "hvg_list_hash": hvg_hash,
             "n_clusters": n_clusters,
+            "n_groups_spatial_steps": n_groups,
             "n_svgs_moran_fdr005": n_svgs_moran,
             "n_svgs_geary_fdr005": n_svgs_geary,
         },
@@ -620,17 +657,22 @@ def save_results(
     adata.obs[["leiden_1.0"]].to_csv(cluster_path)
     print(f"  Clusters saved: {cluster_path}")
 
+    group_key = result["metadata"].get("groups", {}).get("group_key", "leiden_1.0")
+
+    # Groups used by the spatial steps are the labels file restricted to
+    # these observations; its md5 is in result["metadata"]["groups"].
+
     # Co-occurrence results
-    if "leiden_1.0_co_occurrence" in adata.uns:
-        co_occ = adata.uns["leiden_1.0_co_occurrence"]
+    if f"{group_key}_co_occurrence" in adata.uns:
+        co_occ = adata.uns[f"{group_key}_co_occurrence"]
         if isinstance(co_occ, dict) and "occ" in co_occ:
             co_occ_path = output_dir / f"{prefix}_co_occurrence.npy"
             np.save(co_occ_path, co_occ["occ"])
             print(f"  Co-occurrence saved: {co_occ_path}")
 
     # Neighborhood enrichment results
-    if "leiden_1.0_nhood_enrichment" in adata.uns:
-        nhood = adata.uns["leiden_1.0_nhood_enrichment"]
+    if f"{group_key}_nhood_enrichment" in adata.uns:
+        nhood = adata.uns[f"{group_key}_nhood_enrichment"]
         if isinstance(nhood, dict) and "zscore" in nhood:
             nhood_path = output_dir / f"{prefix}_nhood_enrichment.npy"
             np.save(nhood_path, nhood["zscore"])
@@ -677,6 +719,15 @@ Examples:
         help="Number of repeat runs (default: 1)",
     )
     parser.add_argument(
+        "--repeat-id", type=int, default=None,
+        help="Run exactly one repetition with this id (one process per repetition)",
+    )
+    parser.add_argument(
+        "--labels-from", type=str, default=None,
+        help="CSV (barcode index, one label column) with the groups used by "
+             "co-occurrence, nhood enrichment and ligrec",
+    )
+    parser.add_argument(
         "--device", type=int, default=0,
         help="GPU device index (default: 0)",
     )
@@ -709,16 +760,23 @@ def main() -> None:
     # Initialize NVML
     init_nvml()
 
+    if args.repeat_id is not None:
+        repeats = [args.repeat_id]
+    else:
+        repeats = list(range(1, args.n_repeats + 1))
+
     try:
-        for repeat in range(1, args.n_repeats + 1):
+        for repeat in repeats:
             print(f"\n{'#' * 70}")
-            print(f"# REPEAT {repeat}/{args.n_repeats}")
+            print(f"# REPEAT {repeat} (process-local index {repeats.index(repeat) + 1}/{len(repeats)})")
             print(f"{'#' * 70}")
 
             result, adata = run_pipeline(
                 data_dir, args.platform, args.device,
                 bin_size=args.bin_size, max_spots=args.max_spots,
+                labels_from=args.labels_from,
             )
+            result["metadata"]["repeats_in_this_process"] = len(repeats)
             save_results(result, adata, output_dir, repeat)
 
             del adata
@@ -727,7 +785,7 @@ def main() -> None:
     finally:
         shutdown_nvml()
 
-    print(f"\nAll {args.n_repeats} repeat(s) completed!")
+    print(f"\nAll {len(repeats)} repeat(s) completed!")
 
 
 if __name__ == "__main__":

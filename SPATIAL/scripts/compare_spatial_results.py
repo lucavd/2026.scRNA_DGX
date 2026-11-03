@@ -26,6 +26,10 @@ from scipy.stats import spearmanr
 from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score
 
 
+# Optional separate directory for the CPU files (CPU reference on another machine)
+CPU_RESULTS_DIR: Path | None = None
+
+
 def load_pair(
     results_dir: Path, platform: str, repeat: int,
     bin_size: str | None = None,
@@ -43,6 +47,7 @@ def load_pair(
     """
     data = {}
     for pipeline in ["cpu", "gpu"]:
+        pdir = CPU_RESULTS_DIR if (pipeline == "cpu" and CPU_RESULTS_DIR is not None) else results_dir
         if platform == "visium_hd" and bin_size:
             prefix = f"spatial_{pipeline}_{platform}_{bin_size}_r{repeat}"
         else:
@@ -50,36 +55,36 @@ def load_pair(
 
         entry = {
             "json": json.loads(
-                (results_dir / f"{prefix}_results.json").read_text()
+                (pdir / f"{prefix}_results.json").read_text()
             ),
             "clusters": pd.read_csv(
-                results_dir / f"{prefix}_clusters.csv", index_col=0
+                pdir / f"{prefix}_clusters.csv", index_col=0
             ),
         }
 
         # Moran's I
-        moran_path = results_dir / f"{prefix}_moranI.csv"
+        moran_path = pdir / f"{prefix}_moranI.csv"
         if moran_path.exists():
             entry["moranI"] = pd.read_csv(moran_path, index_col=0)
         else:
             entry["moranI"] = None
 
         # Geary's C
-        geary_path = results_dir / f"{prefix}_gearyC.csv"
+        geary_path = pdir / f"{prefix}_gearyC.csv"
         if geary_path.exists():
             entry["gearyC"] = pd.read_csv(geary_path, index_col=0)
         else:
             entry["gearyC"] = None
 
         # Co-occurrence
-        co_occ_path = results_dir / f"{prefix}_co_occurrence.npy"
+        co_occ_path = pdir / f"{prefix}_co_occurrence.npy"
         if co_occ_path.exists():
             entry["co_occurrence"] = np.load(co_occ_path)
         else:
             entry["co_occurrence"] = None
 
         # Neighborhood enrichment
-        nhood_path = results_dir / f"{prefix}_nhood_enrichment.npy"
+        nhood_path = pdir / f"{prefix}_nhood_enrichment.npy"
         if nhood_path.exists():
             entry["nhood_enrichment"] = np.load(nhood_path)
         else:
@@ -460,13 +465,24 @@ Examples:
         "--n-repeats", type=int, default=1,
         help="Number of repeats to compare (default: 1)",
     )
+    parser.add_argument(
+        "--cpu-results-dir", type=str, default=None,
+        help="Directory with the CPU files, if different from --results-dir",
+    )
+    parser.add_argument(
+        "--output-dir", type=str, default=None,
+        help="Where to write the concordance JSON (default: --results-dir)",
+    )
     return parser.parse_args()
 
 
 def main() -> None:
     """Main entry point."""
+    global CPU_RESULTS_DIR
     args = parse_args()
     results_dir = Path(args.results_dir)
+    if args.cpu_results_dir is not None:
+        CPU_RESULTS_DIR = Path(args.cpu_results_dir)
 
     if not results_dir.exists():
         print(f"ERROR: Results directory not found: {results_dir}")
@@ -486,7 +502,9 @@ def main() -> None:
 
     # Save concordance results
     suffix = f"_{args.bin_size}" if args.bin_size else ""
-    output_path = results_dir / f"spatial_concordance_{args.platform}{suffix}.json"
+    out_dir = Path(args.output_dir) if args.output_dir else results_dir
+    out_dir.mkdir(parents=True, exist_ok=True)
+    output_path = out_dir / f"spatial_concordance_{args.platform}{suffix}.json"
     with open(output_path, "w") as f:
         json.dump(all_results, f, indent=2)
     print(f"\n\nConcordance results saved: {output_path}")
