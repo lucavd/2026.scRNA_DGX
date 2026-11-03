@@ -10,6 +10,7 @@
 * [Il riferimento spatial gira a server libero, quando lo dice il PI (D-09)](D-09.md) - Il nuovo calcolo spatial parte solo in una finestra indicata dal PI, con i calcoli degli altri progetti sospesi.
 * [Effetto del cambio di driver GPU: si misura (D-10)](D-10.md) - Il cambio di driver GPU fra marzo e oggi si quantifica confrontando i tempi GPU nuovi con quelli di marzo; se coincidono, nei Metodi basta una frase breve.
 * [CPU dello spatial: DGX come riferimento, server come controllo (D-11)](D-11.md) - Il riferimento CPU dello spatial si misura sul nodo DGX del gruppo, riservato per intero, con 100 CPU come lo scRNA; la stessa misura sul server serve da controllo.
+* [Co-occorrenza GPU: difetto riportato, esclusa dagli speedup a HD, verifica con rapids-singlecell 0.15.1 (D-13)](D-13.md) - La co-occorrenza GPU a Visium HD 8 µm (overflow in rapids-singlecell 0.14.1) si riporta come risultato, si toglie dagli speedup a Visium HD e si verifica la correzione della versione 0.15.1 con un calcolo di circa 20 minuti.
 
 # Decisioni tecniche
 
