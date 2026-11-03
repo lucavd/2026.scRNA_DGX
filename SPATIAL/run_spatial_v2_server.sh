@@ -18,7 +18,8 @@ REPO_DATA=${REPO_DATA:-/mnt/wwn-0x5000039d58caca35/2026.scRNA_DGX/SPATIAL/data}
 IMAGE="lucavd/sc-benchmark-spatial:latest"
 IMAGE_ID=$(docker image inspect "$IMAGE" --format '{{.Id}}')
 GIT_COMMIT=$(git -C "$WT" rev-parse HEAD)
-OUT=SPATIAL/results_v2
+OUT=${OUT:-SPATIAL/results_v2}
+WAIT_FREE_MAX_S=${WAIT_FREE_MAX_S:-1200}
 N_REPEATS=${N_REPEATS:-5}
 LOAD_MAX=${LOAD_MAX:-3.0}
 TOP_PCPU_MAX=${TOP_PCPU_MAX:-50}
@@ -62,7 +63,17 @@ drun() {  # docker run with fresh JIT caches; $1 = container name, rest = comman
         "$IMAGE" "$@"
 }
 
-PLATFORMS=("visium::" "visium_hd:square_008um:" "visium_hd:square_002um:400000")
+if [ -n "${PLATFORMS_OVERRIDE:-}" ]; then read -r -a PLATFORMS <<< "$PLATFORMS_OVERRIDE"
+else PLATFORMS=("visium::" "visium_hd:square_008um:" "visium_hd:square_002um:400000"); fi
+
+wait_free() {  # poll the preflight every 20 s (load average decays after our own runs)
+    local waited=0
+    until preflight > /tmp/lnbi_s1_preflight.txt 2>&1; do
+        if [ "$waited" -ge "$WAIT_FREE_MAX_S" ]; then cat /tmp/lnbi_s1_preflight.txt; echo "wait_free: gave up after ${waited}s"; return 3; fi
+        sleep 20; waited=$((waited + 20))
+    done
+    echo "wait_free: free after ${waited}s ($(head -n 1 /tmp/lnbi_s1_preflight.txt))"
+}
 
 plat_args() {  # "platform:bin:max" -> CLI args and file prefix
     IFS=: read -r P B M <<< "$1"
@@ -76,11 +87,12 @@ run_reps() {  # $1 = cpu|gpu, $2 = outdir
     mkdir -p "$WT/$od/host_snapshots"
     for spec in "${PLATFORMS[@]}"; do
         plat_args "$spec"
-        LABELS="$OUT/dgx_cpu/spatial_cpu_${TAG}_r1_clusters.csv"
+        LABELS="${LABELS_DIR:-$OUT/dgx_cpu}/spatial_cpu_${TAG}_r1_clusters.csv"
         if [ ! -f "$WT/$LABELS" ]; then echo "missing reference labels $LABELS"; return 4; fi
         for r in $(seq 1 "$N_REPEATS"); do
-            preflight || return 3
             local stem="spatial_${dev}_${TAG}_r${r}"
+            if [ -f "$WT/$od/${stem}_results.json" ]; then echo "$stem exists, skipped"; continue; fi
+            wait_free || return 3
             snapshot "$WT/$od/host_snapshots/${stem}_start.txt"
             local extra=()
             [ "$dev" = "cpu" ] && extra=(--n-cpus 128)
@@ -92,15 +104,16 @@ run_reps() {  # $1 = cpu|gpu, $2 = outdir
             local rc=$?
             snapshot "$WT/$od/host_snapshots/${stem}_end.txt"
             echo "$stem rc=$rc wall=$(( $(date +%s) - t0 ))s"
-            [ $rc -ne 0 ] && return $rc
+            if [ $rc -ne 0 ]; then return $rc; fi
         done
     done
+    return 0
 }
 
 case "$MODE" in
     preflight) preflight ;;
     thermal)
-        ROLE=server_thermal_test; preflight || exit 3
+        ROLE=server_thermal_test; wait_free || exit 3
         mkdir -p "$WT/$OUT/thermal"
         ( for i in $(seq 1 150); do
               echo "$(date -u +%s) $(sensors | awk '/Tctl/ {gsub(/[+°C]/,"",$2); print $2}') $(awk '/MHz/ {s+=$4; n++} END {printf "%.0f", s/n}' /proc/cpuinfo) $(cut -d' ' -f1 /proc/loadavg)"

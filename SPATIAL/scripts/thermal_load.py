@@ -33,4 +33,4 @@ while time.time() < t_end:
     t0 = time.perf_counter()
     burn(x, 200_000)
     n += 1
-    print(f"batch {n} {time.perf_counter() - t0:.3f}s threads={numba.get_num_threads()}", flush=True)
+    print(f"batch {n} {time.time():.2f} {time.perf_counter() - t0:.4f} threads={numba.get_num_threads()}", flush=True)
