@@ -2,6 +2,8 @@
 
 ## 2026-11-03
 
+- [nuovo riferimento spatial (S1)](steps/S1.md): rerun completato (DGX `poddgx02` per la CPU di riferimento, RTX 4090 e controllo CPU a 128 thread sul server libero); 5 cancelli superati; trovato e spiegato l'overflow della co-occorrenza GPU in rapids-singlecell 0.14.1 a Visium HD 8 µm; risultati in `SPATIAL/results_v2/`, report `reports/S1.html`; dubbi rinviati ai file di S2, S3 e S5. Step non chiuso: manca la decisione del PI sulla co-occorrenza.
+
 - [nuovo riferimento spatial (S1)](steps/S1.md): attese pre-registrate (5 cancelli, 6 previsioni, criterio della prova termica) e anomalie viste all'apertura; registrata la decisione tecnica [Come gira il nuovo riferimento spatial (D-12)](decisions/D-12.md); aggiunto `tools/s1_march_reference.py`, che rilegge i valori di marzo usati nelle previsioni.
 
 - [basi del lavoro (S0)](steps/S0.md) chiuso: registrata [CPU dello spatial: DGX come riferimento, server come controllo (D-11)](decisions/D-11.md) (CPU dello spatial sul DGX come riferimento, server come controllo); accesso dal server al DGX con chiave dedicata; approvazione del PI nel file dello step.
