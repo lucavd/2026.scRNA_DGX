@@ -1,0 +1,13 @@
+# Decisioni del PI (3 novembre 2026)
+
+* [Nuovo riferimento CPU per lo spatial (D-01)](D-01.md) - Lo spatial si rifà con ogni ripetizione in un processo nuovo e con gli stessi gruppi di cellule per CPU e GPU negli step spaziali.
+* [Multi-GPU ridotto a ciò che è stato misurato (D-02)](D-02.md) - La parte multi-GPU diventa un paragrafo: la matrice restava su una GPU e le schede aggiuntive non partecipavano al calcolo; nessun nuovo run sul DGX.
+* [Lunghezza del capitolo: circa 15 pagine LNCS (D-03)](D-03.md) - Il capitolo punta a circa 15 pagine in formato Springer LNCS.
+* [Espressione differenziale come confronto di tempi (D-04)](D-04.md) - L'espressione differenziale si presenta solo come confronto di tempi, senza dire che lo pseudo-bulk usato sia l'approccio statisticamente più rigoroso.
+* [CUP corretto del progetto DARE (D-05)](D-05.md) - Il codice CUP del progetto DARE nei ringraziamenti è B53C22006440001; quello nel capitolo è un refuso.
+* [Lo short paper è chiuso (D-06)](D-06.md) - Si lavora solo sul capitolo LNBI; lo short paper CIBB non si modifica più.
+* [Si lavora solo sul server (D-07)](D-07.md) - Dal 3 novembre 2026 il repo di lavoro è il clone sul server lesexp-server; il clone sul Mac è fermo e non si aggiorna.
+
+# Decisioni tecniche
+
+* [Integrità dei risultati grezzi con un manifest md5 (D-08)](D-08.md) - I risultati grezzi si controllano con il manifest md5 del 3 novembre 2026, perché la maggior parte dei file non è tracciata da git.
