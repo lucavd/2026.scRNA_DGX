@@ -7,6 +7,8 @@
 * [CUP corretto del progetto DARE (D-05)](D-05.md) - Il codice CUP del progetto DARE nei ringraziamenti è B53C22006440001; quello nel capitolo è un refuso.
 * [Lo short paper è chiuso (D-06)](D-06.md) - Si lavora solo sul capitolo LNBI; lo short paper CIBB non si modifica più.
 * [Si lavora solo sul server (D-07)](D-07.md) - Dal 3 novembre 2026 il repo di lavoro è il clone sul server lesexp-server; il clone sul Mac è fermo e non si aggiorna.
+* [Il riferimento spatial gira a server libero, quando lo dice il PI (D-09)](D-09.md) - Il nuovo calcolo spatial parte solo in una finestra indicata dal PI, con i calcoli degli altri progetti sospesi.
+* [Effetto del cambio di driver GPU: si misura (D-10)](D-10.md) - Il cambio di driver GPU fra marzo e oggi si quantifica confrontando i tempi GPU nuovi con quelli di marzo; se coincidono, nei Metodi basta una frase breve.
 
 # Decisioni tecniche
 
