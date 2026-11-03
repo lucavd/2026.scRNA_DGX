@@ -14,3 +14,4 @@
 # Decisioni tecniche
 
 * [Integrità dei risultati grezzi con un manifest md5 (D-08)](D-08.md) - I risultati grezzi si controllano con il manifest md5 del 3 novembre 2026, perché la maggior parte dei file non è tracciata da git.
+* [Come gira il nuovo riferimento spatial (D-12)](D-12.md) - Scelte tecniche del calcolo spatial di S1: processi freddi, gruppi dal DGX, passo SLURM da 100 CPU, ramo separato, file grandi fuori da git.
