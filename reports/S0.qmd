@@ -40,6 +40,15 @@ Appena decidi questi due punti, lo step è chiuso.
 
 
 
+# Risposte del PI e chiusura
+
+- Finestra del calcolo spatial: la indica il PI, con gli altri progetti sospesi (D-09).
+- Macchina della CPU: il DGX (nodo `poddgx02` riservato, 100 CPU come lo scRNA) è il riferimento, il server il controllo (D-11). Accesso dal server al DGX verificato con una chiave dedicata.
+- Driver GPU: si quantifica il confronto con marzo; se coincide, una frase breve nei Metodi (D-10).
+- Temperatura: il PI ha cambiato la pasta termica; alle 10:49-10:55 Tctl era 80-82 °C con load average 45-64, contro 89 °C con circa 45 processi a ottobre. La prova termica a server libero resta il controllo.
+
+Step chiuso il 3 novembre 2026.
+
 # Dubbi rinviati
 
 Al nuovo riferimento spatial (`docs/steps/S1.md`): server occupato, limite termico e driver GPU cambiato. Si leggono prima di lanciare il calcolo.

@@ -9,6 +9,7 @@
 * [Si lavora solo sul server (D-07)](D-07.md) - Dal 3 novembre 2026 il repo di lavoro è il clone sul server lesexp-server; il clone sul Mac è fermo e non si aggiorna.
 * [Il riferimento spatial gira a server libero, quando lo dice il PI (D-09)](D-09.md) - Il nuovo calcolo spatial parte solo in una finestra indicata dal PI, con i calcoli degli altri progetti sospesi.
 * [Effetto del cambio di driver GPU: si misura (D-10)](D-10.md) - Il cambio di driver GPU fra marzo e oggi si quantifica confrontando i tempi GPU nuovi con quelli di marzo; se coincidono, nei Metodi basta una frase breve.
+* [CPU dello spatial: DGX come riferimento, server come controllo (D-11)](D-11.md) - Il riferimento CPU dello spatial si misura sul nodo DGX del gruppo, riservato per intero, con 100 CPU come lo scRNA; la stessa misura sul server serve da controllo.
 
 # Decisioni tecniche
 
