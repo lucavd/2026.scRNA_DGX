@@ -2,11 +2,11 @@
 """Prepare the PCA input of the neighbour step exactly as scripts/benchmark_cpu.py
 (QC, normalize_total 1e4, log1p, HVG default flavor 2000, subset, dense scale
 max_value 10, PCA 50 comps seed 42) and save X_pca. Not timed.
-Usage: python -B tools/s2_neighbors_prep.py --size 10000 --out results_v2/S2/neighbors"""
+Usage: python -B tools/s2_neighbors_prep.py --size 10000 --out results_v2/S2/neighbors [--data-dir data]"""
 import os, argparse
-ap = argparse.ArgumentParser(); ap.add_argument("--size", type=int); ap.add_argument("--out"); a = ap.parse_args()
+ap = argparse.ArgumentParser(); ap.add_argument("--size", type=int); ap.add_argument("--out"); ap.add_argument("--data-dir", default="data"); a = ap.parse_args()
 import json, hashlib, warnings, numpy as np, scanpy as sc
-ad = sc.read_h5ad(f"data/brain_{a.size}.h5ad")
+ad = sc.read_h5ad(os.path.join(a.data_dir, f"brain_{a.size}.h5ad"))
 with warnings.catch_warnings():
     warnings.simplefilter("ignore")
     ad.var["mt"] = ad.var_names.str.startswith(("MT-", "mt-"))

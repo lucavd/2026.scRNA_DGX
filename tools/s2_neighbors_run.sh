@@ -1,7 +1,7 @@
 #!/bin/bash
 # S2 neighbour measurement: prep (not timed), then 3 sizes x n_jobs {1,100} x 5 repetitions,
 # one fresh process each, with free-machine checks. Usage: bash tools/s2_neighbors_run.sh PY OUT
-PY=$1; OUT=$2; mkdir -p $OUT
+PY=$1; OUT=$2; DATA=${3:-data}; mkdir -p $OUT
 snap() {  # prints JSON: load1, tctl, foreign processes over 50% CPU
 python3 - "$@" <<'PYS'
 import json, os, re, subprocess, sys
@@ -13,7 +13,7 @@ fo = [p.strip()[:100] for p in ps if float(p.split(None, 2)[1]) > 50 and "s2_nei
 print(json.dumps({"load1": l1, "tctl": tc, "n_foreign": len(fo), "foreign": fo}))
 PYS
 }
-for n in 10000 50000 100000; do $PY -B tools/s2_neighbors_prep.py --size $n --out $OUT; done
+for n in 10000 50000 100000; do $PY -B tools/s2_neighbors_prep.py --size $n --out $OUT --data-dir $DATA; done
 # wait for a free machine: 3 checks 20 s apart with load1 <= 3 and no foreign process (max 30 min)
 ok=0; for i in $(seq 1 90); do s=$(snap); l=$(echo $s | python3 -c "import json,sys;d=json.load(sys.stdin);print(int(d['load1']<=3 and d['n_foreign']==0))"); if [ "$l" = 1 ]; then ok=$((ok+1)); else ok=0; fi; [ $ok -ge 3 ] && break; sleep 20; done
 [ $ok -ge 3 ] || { echo "NOT FREE"; snap; exit 3; }
