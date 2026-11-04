@@ -25,13 +25,13 @@ def split_md(md):
     yaml = m.group(1)
     title = re.search(r'title:\s*"(.*)"', yaml).group(1)
     rest = md[m.end():]
-    i = rest.index("\n# Introduction")
+    i = rest.index("\n# ")  # body starts at the first top-level heading
     head, body = rest[:i], rest[i + 1:]
     paras = [p.strip() for p in head.split("\n\n") if p.strip()]
     authors = paras[0]
     insts = [p for p in paras if p.startswith("^")]
-    abstract = [p for p in paras if p.startswith("**Abstract.**")][0]
-    keywords = [p for p in paras if p.startswith("**Keywords:**")][0]
+    abstract = ([p for p in paras if p.startswith("**Abstract.**")] or [""])[0]
+    keywords = ([p for p in paras if p.startswith("**Keywords:**")] or [""])[0]
     return title, authors, insts, abstract, keywords, body
 
 def pandoc(text, extra=()):
@@ -94,10 +94,7 @@ def build(src, out, tag):
 \authorrunning{L. Vedovelli et al.}
 \institute{%s}
 \maketitle
-\begin{abstract}
 %s
-\keywords{%s}
-\end{abstract}
 %s
 \typeout{REFSTART \thepage}
 \bibliographystyle{splncs04}
@@ -105,7 +102,7 @@ def build(src, out, tag):
 \typeout{DOCEND \thepage}
 \end{document}
 """ % (pandoc(title).strip(), r" \and ".join(atex), " \\and\n".join(itex),
-       fix_cites(pandoc(abs_txt)).strip(), kw, btex)
+       ("\\begin{abstract}\n" + fix_cites(pandoc(abs_txt)).strip() + "\n\\keywords{" + kw + "}\n\\end{abstract}") if abs_txt else "", btex)
     if os.path.isdir(out):
         shutil.rmtree(out)
     os.makedirs(out)
