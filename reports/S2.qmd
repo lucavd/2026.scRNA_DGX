@@ -37,6 +37,8 @@ Appena decidi questi 3 punti, lo step è chiuso.
 **Sui tempi di calcolo.** Restano cinque passi. Stima, basata sul numero di correzioni per passo: correzioni di sostanza 1,5 giorni (190 correzioni e le prime scelte su titolo e abstract), figure scRNA 1 giorno, integrazione dello spatial 1 giorno (49 correzioni e tre figure), taglio e stile mezza giornata, LaTeX e verifica finale 1 giorno. Sono 5 giorni di lavoro: la sottomissione arriverebbe il 9 o il 10 novembre, se le tue decisioni arrivano entro la giornata in cui le chiedo. Non c'è margine: consiglio di chiedere già ora agli organizzatori qualche giorno in più, come precauzione.
 
 
+**Decisioni del PI (4 novembre).** Approvati il piano, la convenzione della media di tutte e 5 le ripetizioni (D-15) e il trattamento dei vicini CPU (D-16). La misura dei vicini fatta subito dopo, a server libero e sui dati del benchmark, dà un rapporto fra 1 e 100 thread di 1,16, 1,91 e 2,48 a 10.000, 50.000 e 100.000 cellule; i tempi del DGX coincidono con quelli a 1 thread. Step chiuso.
+
 # Dubbi rinviati
 
 | a | cosa | perché | cosa serve per chiuderlo |
@@ -235,3 +237,30 @@ b47c8d35009016fcb29951f30625ba7d  tools/s2_repetitions.py
 | 6% dei bin a 2 µm | registro R0465; `SPATIAL/scripts/benchmark_spatial_cpu.py` `--max-spots` | 400.000 / 6.296.688 = 6,35% |
 | 12,0x e 14,0x a 10 mila cellule | `S2_P3_convenzione.csv`, 10.000, gpu | 12,026; 13,953 |
 | 28 scelte del PI | `piano/PIANO_testa.md`, sezioni «In S3» e «In S5» | 22 e 6 |
+
+# Misura dei vicini con 1 e 100 thread (D-16)
+
+Riferimento: la ripetizione sui dati del DGX (`results_v2/S2/neighbors_dgxdata/neighbors_eval.json`, script `tools/s2_neighbors_eval.py`). Ambiente con numba 0.61.2 come il container; 30 processi, uno per ripetizione.
+
+| id | atteso | osservato | esito |
+|---|---|---|---|
+| N1 | macchina libera | load1 1,00 prima della prima ripetizione; 0 processi estranei sopra il 50% all'inizio e alla fine di tutte le 30 ripetizioni; Tctl massimo 71,1 °C | superato |
+| N2 | stessi dati del benchmark | md5 dei tre file uguali a quelli sul DGX; dopo il QC 10000/26228, 49998/30935, 99996/32869 cellule/geni, uguali a `results_summary` dei JSON del benchmark | superato |
+| N3 | thread | numba a 100 all'avvio di ogni processo; chiamate [1, 100, 1, 100] con `n_jobs = 1`, [100, 100, 100, 100] con `n_jobs = 100` | superato |
+
+| cellule | caldo, 1 thread (s) | caldo, 100 thread (s) | NP1 rapporto [IC 95%] | esito NP1 | DGX, vicini r2-5 (s) | NP2 DGX / server 1 thread | esito NP2 | freddo 1 / 100 thread (s) |
+|--:|--:|--:|--:|---|--:|--:|---|--:|
+| 10.000 | 1,41 ± 0,005 | 1,21 ± 0,004 | 1,163 [1,159; 1,168] | confermata | 1,12 | 0,795 | confermata | 30,1 / 29,9 |
+| 50.000 | 3,09 ± 0,007 | 1,62 ± 0,011 | 1,907 [1,896; 1,917] | confermata | 2,82 | 0,913 | confermata | 31,5 / 30,4 |
+| 100.000 | 5,74 ± 0,029 | 2,31 ± 0,022 | 2,479 [2,459; 2,499] | confermata | 5,44 | 0,947 | confermata | 34,3 / 31,2 |
+
+Controllo sui dati del server (prima misura, cancello N2 fallito perché i file non sono quelli del benchmark; `results_v2/S2/neighbors/neighbors_eval.json`):
+
+| cellule | caldo, 1 thread (s) | caldo, 100 thread (s) | NP1 rapporto [IC 95%] | esito NP1 | DGX, vicini r2-5 (s) | NP2 DGX / server 1 thread | esito NP2 | freddo 1 / 100 thread (s) |
+|--:|--:|--:|--:|---|--:|--:|---|--:|
+| 10.000 | 1,29 ± 0,009 | 1,13 ± 0,019 | 1,138 [1,122; 1,154] | confermata | 1,12 | 0,869 | confermata | 27,6 / 27,7 |
+| 50.000 | 2,81 ± 0,024 | 1,58 ± 0,008 | 1,777 [1,764; 1,791] | confermata | 2,82 | 1,005 | confermata | 29,0 / 28,2 |
+| 100.000 | 5,10 ± 0,021 | 2,19 ± 0,017 | 2,330 [2,314; 2,346] | confermata | 5,44 | 1,066 | confermata | 31,3 / 28,8 |
+
+Lettura: con `n_jobs = 1` la ricerca dei vicini a caldo è più lenta da 1,16 a 2,48 volte che con 100 thread, e il divario cresce con la dimensione; i tempi del DGX coincidono con quelli del server a 1 thread (rapporto da 0,80 a 0,95), non con quelli a 100. A freddo (prima chiamata) domina la compilazione, circa 30 s con entrambe le impostazioni. Le due misure danno la stessa lettura. La copia dei dati su `/mnt/micron/lnbi_scrna/data_dgx/` è stata cancellata a misura finita (indicazione del PI); restano gli md5 in `results_v2/S2/neighbors_dgxdata/input_md5_dgx.txt`.
+

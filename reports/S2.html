@@ -3062,6 +3062,7 @@ vertical-align: -.125em;
   <li><a href="#il-piano" id="toc-il-piano" class="nav-link" data-scroll-target="#il-piano">Il piano</a></li>
   <li><a href="#cosa-è-girato" id="toc-cosa-è-girato" class="nav-link" data-scroll-target="#cosa-è-girato">Cosa è girato</a></li>
   <li><a href="#appendice-da-dove-vengono-i-numeri-del-riassunto" id="toc-appendice-da-dove-vengono-i-numeri-del-riassunto" class="nav-link" data-scroll-target="#appendice-da-dove-vengono-i-numeri-del-riassunto">Appendice: da dove vengono i numeri del riassunto</a></li>
+  <li><a href="#misura-dei-vicini-con-1-e-100-thread-d-16" id="toc-misura-dei-vicini-con-1-e-100-thread-d-16" class="nav-link" data-scroll-target="#misura-dei-vicini-con-1-e-100-thread-d-16">Misura dei vicini con 1 e 100 thread (D-16)</a></li>
   </ul>
 </nav>
 </div>
@@ -3112,6 +3113,7 @@ vertical-align: -.125em;
 </ul>
 <p>Appena decidi questi 3 punti, lo step è chiuso.</p>
 <p><strong>Sui tempi di calcolo.</strong> Restano cinque passi. Stima, basata sul numero di correzioni per passo: correzioni di sostanza 1,5 giorni (190 correzioni e le prime scelte su titolo e abstract), figure scRNA 1 giorno, integrazione dello spatial 1 giorno (49 correzioni e tre figure), taglio e stile mezza giornata, LaTeX e verifica finale 1 giorno. Sono 5 giorni di lavoro: la sottomissione arriverebbe il 9 o il 10 novembre, se le tue decisioni arrivano entro la giornata in cui le chiedo. Non c’è margine: consiglio di chiedere già ora agli organizzatori qualche giorno in più, come precauzione.</p>
+<p><strong>Decisioni del PI (4 novembre).</strong> Approvati il piano, la convenzione della media di tutte e 5 le ripetizioni (D-15) e il trattamento dei vicini CPU (D-16). La misura dei vicini fatta subito dopo, a server libero e sui dati del benchmark, dà un rapporto fra 1 e 100 thread di 1,16, 1,91 e 2,48 a 10.000, 50.000 e 100.000 cellule; i tempi del DGX coincidono con quelli a 1 thread. Step chiuso.</p>
 </section>
 <section id="dubbi-rinviati" class="level1">
 <h1>Dubbi rinviati</h1>
@@ -4132,6 +4134,170 @@ b47c8d35009016fcb29951f30625ba7d  tools/s2_repetitions.py</code></pre>
 </tr>
 </tbody>
 </table>
+</section>
+<section id="misura-dei-vicini-con-1-e-100-thread-d-16" class="level1">
+<h1>Misura dei vicini con 1 e 100 thread (D-16)</h1>
+<p>Riferimento: la ripetizione sui dati del DGX (<code>results_v2/S2/neighbors_dgxdata/neighbors_eval.json</code>, script <code>tools/s2_neighbors_eval.py</code>). Ambiente con numba 0.61.2 come il container; 30 processi, uno per ripetizione.</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+<col style="width: 25%">
+</colgroup>
+<thead>
+<tr class="header">
+<th>id</th>
+<th>atteso</th>
+<th>osservato</th>
+<th>esito</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>N1</td>
+<td>macchina libera</td>
+<td>load1 1,00 prima della prima ripetizione; 0 processi estranei sopra il 50% all’inizio e alla fine di tutte le 30 ripetizioni; Tctl massimo 71,1 °C</td>
+<td>superato</td>
+</tr>
+<tr class="even">
+<td>N2</td>
+<td>stessi dati del benchmark</td>
+<td>md5 dei tre file uguali a quelli sul DGX; dopo il QC 10000/26228, 49998/30935, 99996/32869 cellule/geni, uguali a <code>results_summary</code> dei JSON del benchmark</td>
+<td>superato</td>
+</tr>
+<tr class="odd">
+<td>N3</td>
+<td>thread</td>
+<td>numba a 100 all’avvio di ogni processo; chiamate [1, 100, 1, 100] con <code>n_jobs = 1</code>, [100, 100, 100, 100] con <code>n_jobs = 100</code></td>
+<td>superato</td>
+</tr>
+</tbody>
+</table>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 11%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: right;">cellule</th>
+<th style="text-align: right;">caldo, 1 thread (s)</th>
+<th style="text-align: right;">caldo, 100 thread (s)</th>
+<th style="text-align: right;">NP1 rapporto [IC 95%]</th>
+<th>esito NP1</th>
+<th style="text-align: right;">DGX, vicini r2-5 (s)</th>
+<th style="text-align: right;">NP2 DGX / server 1 thread</th>
+<th>esito NP2</th>
+<th style="text-align: right;">freddo 1 / 100 thread (s)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">10.000</td>
+<td style="text-align: right;">1,41 ± 0,005</td>
+<td style="text-align: right;">1,21 ± 0,004</td>
+<td style="text-align: right;">1,163 [1,159; 1,168]</td>
+<td>confermata</td>
+<td style="text-align: right;">1,12</td>
+<td style="text-align: right;">0,795</td>
+<td>confermata</td>
+<td style="text-align: right;">30,1 / 29,9</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">50.000</td>
+<td style="text-align: right;">3,09 ± 0,007</td>
+<td style="text-align: right;">1,62 ± 0,011</td>
+<td style="text-align: right;">1,907 [1,896; 1,917]</td>
+<td>confermata</td>
+<td style="text-align: right;">2,82</td>
+<td style="text-align: right;">0,913</td>
+<td>confermata</td>
+<td style="text-align: right;">31,5 / 30,4</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">100.000</td>
+<td style="text-align: right;">5,74 ± 0,029</td>
+<td style="text-align: right;">2,31 ± 0,022</td>
+<td style="text-align: right;">2,479 [2,459; 2,499]</td>
+<td>confermata</td>
+<td style="text-align: right;">5,44</td>
+<td style="text-align: right;">0,947</td>
+<td>confermata</td>
+<td style="text-align: right;">34,3 / 31,2</td>
+</tr>
+</tbody>
+</table>
+<p>Controllo sui dati del server (prima misura, cancello N2 fallito perché i file non sono quelli del benchmark; <code>results_v2/S2/neighbors/neighbors_eval.json</code>):</p>
+<table class="caption-top table">
+<colgroup>
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 11%">
+<col style="width: 11%">
+</colgroup>
+<thead>
+<tr class="header">
+<th style="text-align: right;">cellule</th>
+<th style="text-align: right;">caldo, 1 thread (s)</th>
+<th style="text-align: right;">caldo, 100 thread (s)</th>
+<th style="text-align: right;">NP1 rapporto [IC 95%]</th>
+<th>esito NP1</th>
+<th style="text-align: right;">DGX, vicini r2-5 (s)</th>
+<th style="text-align: right;">NP2 DGX / server 1 thread</th>
+<th>esito NP2</th>
+<th style="text-align: right;">freddo 1 / 100 thread (s)</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td style="text-align: right;">10.000</td>
+<td style="text-align: right;">1,29 ± 0,009</td>
+<td style="text-align: right;">1,13 ± 0,019</td>
+<td style="text-align: right;">1,138 [1,122; 1,154]</td>
+<td>confermata</td>
+<td style="text-align: right;">1,12</td>
+<td style="text-align: right;">0,869</td>
+<td>confermata</td>
+<td style="text-align: right;">27,6 / 27,7</td>
+</tr>
+<tr class="even">
+<td style="text-align: right;">50.000</td>
+<td style="text-align: right;">2,81 ± 0,024</td>
+<td style="text-align: right;">1,58 ± 0,008</td>
+<td style="text-align: right;">1,777 [1,764; 1,791]</td>
+<td>confermata</td>
+<td style="text-align: right;">2,82</td>
+<td style="text-align: right;">1,005</td>
+<td>confermata</td>
+<td style="text-align: right;">29,0 / 28,2</td>
+</tr>
+<tr class="odd">
+<td style="text-align: right;">100.000</td>
+<td style="text-align: right;">5,10 ± 0,021</td>
+<td style="text-align: right;">2,19 ± 0,017</td>
+<td style="text-align: right;">2,330 [2,314; 2,346]</td>
+<td>confermata</td>
+<td style="text-align: right;">5,44</td>
+<td style="text-align: right;">1,066</td>
+<td>confermata</td>
+<td style="text-align: right;">31,3 / 28,8</td>
+</tr>
+</tbody>
+</table>
+<p>Lettura: con <code>n_jobs = 1</code> la ricerca dei vicini a caldo è più lenta da 1,16 a 2,48 volte che con 100 thread, e il divario cresce con la dimensione; i tempi del DGX coincidono con quelli del server a 1 thread (rapporto da 0,80 a 0,95), non con quelli a 100. A freddo (prima chiamata) domina la compilazione, circa 30 s con entrambe le impostazioni. Le due misure danno la stessa lettura. La copia dei dati su <code>/mnt/micron/lnbi_scrna/data_dgx/</code> è stata cancellata a misura finita (indicazione del PI); restano gli md5 in <code>results_v2/S2/neighbors_dgxdata/input_md5_dgx.txt</code>.</p>
 </section>
 
 </main>
