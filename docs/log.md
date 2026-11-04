@@ -2,6 +2,8 @@
 
 ## 2026-11-04
 
+- [piano di implementazione (S2)](steps/S2.md): il PI approva il piano e le raccomandazioni; registrate [Convenzione unica sulle ripetizioni: media e SD di tutte e 5 (D-15)](decisions/D-15.md) e [Vicini CPU a 1 thread: si dichiara e si misura (D-16)](decisions/D-16.md); attese della misura dei vicini pre-registrate.
+
 - [piano di implementazione (S2)](steps/S2.md): piano generato in `manuscript/revisione_n2/piano/` (269 voci da 424 righe del registro, 6 mappe, revisione con tre revisori, avversariale e ultima passata), registrata la decisione tecnica [Piano di implementazione generato da codice, con arbitrati (D-14)](decisions/D-14.md); analisi P1-P3 in `results_v2/S2/`; trovata la ricerca dei vicini CPU a 1 thread numba (pynndescent con `n_jobs = 1`); `script_e_calcoli.zip` della revisione n.2 ora tracciato; dubbi rinviati ai file di [correzioni di sostanza (S3)](steps/S3.md) e [integrazione spatial (S5)](steps/S5.md); report `reports/S2.html`. Step non chiuso: mancano tre decisioni del PI.
 
 - [nuovo riferimento spatial (S1)](steps/S1.md) chiuso: il PI ha letto il riassunto senza dubbi nuovi (approvazione nel file dello step).

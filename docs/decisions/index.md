@@ -17,3 +17,8 @@
 * [Integrità dei risultati grezzi con un manifest md5 (D-08)](D-08.md) - I risultati grezzi si controllano con il manifest md5 del 3 novembre 2026, perché la maggior parte dei file non è tracciata da git.
 * [Come gira il nuovo riferimento spatial (D-12)](D-12.md) - Scelte tecniche del calcolo spatial di S1: processi freddi, gruppi dal DGX, passo SLURM da 100 CPU, ramo separato, file grandi fuori da git.
 * [Piano di implementazione generato da codice, con arbitrati (D-14)](D-14.md) - Il piano delle correzioni della revisione n.2 sta in manuscript/revisione_n2/piano/, si rigenera con tools/s2_mkplan.py dagli ingressi versionati e registra ogni correzione decisa dopo la scrittura in arbitrati.csv.
+
+# Decisioni del PI (4 novembre 2026)
+
+* [Convenzione unica sulle ripetizioni: media e SD di tutte e 5 (D-15)](D-15.md) - In tutto il capitolo, scRNA e spatial, i tempi sono media e SD campionaria delle 5 ripetizioni e lo speedup è il rapporto fra medie.
+* [Vicini CPU a 1 thread: si dichiara e si misura (D-16)](D-16.md) - I Metodi dicono che la ricerca dei vicini CPU usava pynndescent con n_jobs = 1 (default di Scanpy); l'effetto si misura sul server libero confrontando n_jobs = 1 e 100.
