@@ -2,6 +2,8 @@
 
 ## 2026-11-04
 
+- [piano di implementazione (S2)](steps/S2.md): piano generato in `manuscript/revisione_n2/piano/` (269 voci da 424 righe del registro, 6 mappe, revisione con tre revisori, avversariale e ultima passata), registrata la decisione tecnica [Piano di implementazione generato da codice, con arbitrati (D-14)](decisions/D-14.md); analisi P1-P3 in `results_v2/S2/`; trovata la ricerca dei vicini CPU a 1 thread numba (pynndescent con `n_jobs = 1`); `script_e_calcoli.zip` della revisione n.2 ora tracciato; dubbi rinviati ai file di [correzioni di sostanza (S3)](steps/S3.md) e [integrazione spatial (S5)](steps/S5.md); report `reports/S2.html`. Step non chiuso: mancano tre decisioni del PI.
+
 - [nuovo riferimento spatial (S1)](steps/S1.md) chiuso: il PI ha letto il riassunto senza dubbi nuovi (approvazione nel file dello step).
 
 - [piano di implementazione (S2)](steps/S2.md): attese pre-registrate (5 cancelli, 3 previsioni, criterio della convenzione sulle ripetizioni fissato prima di vederne le conseguenze); aggiunto `tools/check_manifest.py`, che confronta i risultati grezzi con il manifest md5.
@@ -10,7 +12,7 @@
 
 - [nuovo riferimento spatial (S1)](steps/S1.md): registrata [Co-occorrenza GPU: difetto riportato, esclusa dagli speedup a HD, verifica con rapids-singlecell 0.15.1 (D-13)](decisions/D-13.md); verifica con rapids-singlecell 0.15.1 fatta a server libero (19:31-19:36): co-occorrenza GPU uguale alla CPU su 49 distanze su 49, tempo invariato; report aggiornato; riassunto finale al PI.
 
-- [nuovo riferimento spatial (S1)](steps/S1.md): rerun completato (DGX `poddgx02` per la CPU di riferimento, RTX 4090 e controllo CPU a 128 thread sul server libero); 5 cancelli superati; trovato e spiegato l'overflow della co-occorrenza GPU in rapids-singlecell 0.14.1 a Visium HD 8 µm; risultati in `SPATIAL/results_v2/`, report `reports/S1.html`; dubbi rinviati ai file di S2, S3 e S5. Step non chiuso: manca la decisione del PI sulla co-occorrenza.
+- [nuovo riferimento spatial (S1)](steps/S1.md): rerun completato (DGX `poddgx02` per la CPU di riferimento, RTX 4090 e controllo CPU a 128 thread sul server libero); 5 cancelli superati; trovato e spiegato l'overflow della co-occorrenza GPU in rapids-singlecell 0.14.1 a Visium HD 8 µm; risultati in `SPATIAL/results_v2/`, report `reports/S1.html`; dubbi rinviati ai file di [piano delle correzioni (S2)](steps/S2.md), [correzioni di sostanza (S3)](steps/S3.md) e [integrazione spatial (S5)](steps/S5.md). Step non chiuso: manca la decisione del PI sulla co-occorrenza.
 
 - [nuovo riferimento spatial (S1)](steps/S1.md): attese pre-registrate (5 cancelli, 6 previsioni, criterio della prova termica) e anomalie viste all'apertura; registrata la decisione tecnica [Come gira il nuovo riferimento spatial (D-12)](decisions/D-12.md); aggiunto `tools/s1_march_reference.py`, che rilegge i valori di marzo usati nelle previsioni.
 
