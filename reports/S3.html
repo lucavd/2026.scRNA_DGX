@@ -3097,12 +3097,12 @@ vertical-align: -.125em;
 <p><strong>A cosa serviva.</strong> La revisione n.2 aveva lasciato 190 correzioni di sostanza sul capitolo. Questo passo le ha preparate tutte, rileggendo ogni numero dai file dei risultati e, dove serviva, dai log del cluster DGX. Serviva anche a portarti le scelte che cambiano ciò che il capitolo afferma, a cominciare da titolo e abstract.</p>
 <p><strong>Cosa abbiamo trovato.</strong></p>
 <ol type="1">
-<li><strong>Le 190 correzioni sono pronte e controllate: 81 modifiche al testo non dipendono da te, 46 aspettano una tua scelta.</strong> I 483 numeri e riferimenti inseriti sono stati riletti da script dai file e ricontrollati, senza discordanze. Il manoscritto ufficiale non è ancora cambiato: le modifiche entreranno tutte insieme dopo le tue scelte.</li>
+<li><strong>Le 190 correzioni sono pronte e controllate: 81 modifiche al testo non dipendono da te, 46 aspettano una tua scelta.</strong> I 483 numeri e riferimenti inseriti sono stati riletti da script dai file e ricontrollati, senza discordanze. Dopo le tue scelte le modifiche sono entrate tutte insieme nel manoscritto ufficiale, identico all’anteprima che hai letto.</li>
 <li><strong>Il limite di 11,9 milioni di cellule non è un limite di memoria dimostrato.</strong> Il run a 12 milioni si è fermato per un errore alla chiusura del cluster Dask, dopo la ricerca dei vicini; i run da 13,7 milioni in su sono stati terminati dal sistema durante la pre-elaborazione su CPU, senza un messaggio di memoria esaurita. Una variante a blocchi ha completato 12 milioni. Il testo ora dice questo, e non più che la RAM della CPU è il vincolo.</li>
 <li><strong>Alcuni dettagli dei Metodi non corrispondevano a ciò che ha girato, e ora corrispondono.</strong> Il run a 8 GPU aveva 100 CPU, non 200; con una sola GPU la pipeline a 500 mila e 1,3 milioni di cellule si è fermata nel controllo di qualità per un errore di allocazione, non per gli 80 GB della scheda. La ricerca dei vicini su CPU a un solo thread è dichiarata: contro una CPU a 100 thread il vantaggio della GPU sui vicini scenderebbe, a 100 mila cellule, da 44 a circa 18 volte. Il dataset Visium HD analizzato è quello dichiarato nei Metodi; è lo script di download del repository a scaricarne un altro.</li>
 <li><strong>Il testo è cresciuto di circa 2.250 parole, quasi tutte nei Metodi.</strong> Descrivere esattamente il codice che ha girato costa spazio: il corpo del capitolo passa da 9.263 a 11.518 parole. Il taglio verso le 15 pagine sarà più pesante del previsto.</li>
 </ol>
-<p><strong>Cosa devi decidere.</strong></p>
+<p><strong>Cosa hai deciso</strong> (il 4 novembre: titolo A, abstract A, tutte le altre raccomandazioni).</p>
 <ol type="1">
 <li><strong>Quale titolo? Consiglio: A, «GPU-accelerated single-cell (NVIDIA DGX H100) and spatial (RTX 4090) transcriptomics: per-step speedups, capacity and concordance against a 100-CPU reference».</strong> Dice l’hardware di ciascuna modalità, non usa «systematic» e «scalability» e resta riconoscibile rispetto allo short paper senza coincidere. Alternative: B, a domanda e senza hardware («How much do GPUs accelerate single-cell and spatial transcriptomics? Benchmarking rapids-singlecell against Scanpy and Squidpy on a common CPU reference»), più lontano dallo short paper; C, come A ma con «common 100-CPU reference», un po’ più forte del vero, perché i nodi di riferimento sono due.</li>
 <li><strong>Quale abstract? Consiglio: A, di 247 parole.</strong> Tiene tutti i risultati corretti: la scomposizione del 119,6x (il test di Wilcoxon è il 93,5% del tempo CPU; senza di esso lo speedup è 7,9-9,2x), lo stress test descritto come nei log e lo spatial con il nuovo riferimento. B (230 parole) apre con una domanda e toglie il confronto dell’espressione differenziale; C (228) apre dichiarando l’estensione rispetto allo short paper. I tre testi sono nel report.</li>
@@ -3110,11 +3110,11 @@ vertical-align: -.125em;
 </ol>
 <p><strong>Comunque.</strong></p>
 <ul>
-<li>Dopo le tue scelte applicherò al manoscritto tutte le 127 modifiche in un solo passaggio, rifarò i controlli e ti manderò il testo risultante.</li>
+<li>Le 127 modifiche sono state applicate al manoscritto in un solo passaggio e i controlli rifatti sul testo finale sono tutti superati.</li>
 <li>Lo script di download dei dati spatial e lo script SLURM a 8 GPU, cambiato dopo i run, si correggono nel repository quando preparo il pacchetto finale.</li>
 <li>Il taglio a 15 pagine partirà dal conteggio di oggi.</li>
 </ul>
-<p>Appena decidi questi 3 punti, lo step è chiuso.</p>
+<p>Hai deciso i 3 punti: lo step è chiuso.</p>
 <p><strong>Sui tempi di calcolo.</strong> Restano il passaggio finale di questo step (mezza giornata, dopo le tue scelte) e quattro passi: figure scRNA 1 giorno, integrazione dello spatial 1 giorno, taglio e stile 1 giorno invece di mezzo (il testo è più lungo di circa un quarto), LaTeX e verifica finale 1 giorno. Sono 4,5 giorni da domani: la sottomissione cade il 9 o il 10 novembre, senza margine. La stima si basa sul numero di correzioni per passo e sul ritmo di oggi. Resta valido il consiglio di chiedere qualche giorno di proroga.</p>
 </section>
 <section id="le-scelte" class="level1">
