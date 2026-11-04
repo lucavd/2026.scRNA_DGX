@@ -2,6 +2,8 @@
 
 ## 2026-11-04
 
+- [correzioni di sostanza (S3)](steps/S3.md) aperto: attese pre-registrate (5 cancelli, 5 previsioni) prima di ogni modifica al manoscritto; registrata la decisione tecnica [Correzioni di S3 preparate per regione e applicate da script (D-17)](decisions/D-17.md); manifest dei grezzi all'apertura: 921 file, 0 differenze.
+
 - [piano di implementazione (S2)](steps/S2.md) chiuso: misura dei vicini CPU con 1 e 100 thread sui dati del benchmark copiati dal DGX (cancelli superati; rapporto 1,16, 1,91, 2,48 a 10.000, 50.000, 100.000 cellule; tempi del DGX uguali a quelli a 1 thread); copia temporanea su micron cancellata; approvazione del PI nel file dello step; dubbi per [correzioni di sostanza (S3)](steps/S3.md) aggiornati.
 
 - [piano di implementazione (S2)](steps/S2.md): il PI approva il piano e le raccomandazioni; registrate [Convenzione unica sulle ripetizioni: media e SD di tutte e 5 (D-15)](decisions/D-15.md) e [Vicini CPU a 1 thread: si dichiara e si misura (D-16)](decisions/D-16.md); attese della misura dei vicini pre-registrate.

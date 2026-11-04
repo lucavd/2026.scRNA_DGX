@@ -17,6 +17,7 @@
 * [Integrità dei risultati grezzi con un manifest md5 (D-08)](D-08.md) - I risultati grezzi si controllano con il manifest md5 del 3 novembre 2026, perché la maggior parte dei file non è tracciata da git.
 * [Come gira il nuovo riferimento spatial (D-12)](D-12.md) - Scelte tecniche del calcolo spatial di S1: processi freddi, gruppi dal DGX, passo SLURM da 100 CPU, ramo separato, file grandi fuori da git.
 * [Piano di implementazione generato da codice, con arbitrati (D-14)](D-14.md) - Il piano delle correzioni della revisione n.2 sta in manuscript/revisione_n2/piano/, si rigenera con tools/s2_mkplan.py dagli ingressi versionati e registra ogni correzione decisa dopo la scrittura in arbitrati.csv.
+* [Correzioni di S3 preparate per regione e applicate da script (D-17)](D-17.md) - Le 190 voci di S3 si preparano per regione del manoscritto come file di modifiche (ancora, testo nuovo, ricevute dei numeri) e si applicano con un unico script che controlla ancore e sovrapposizioni e scrive il diario.
 
 # Decisioni del PI (4 novembre 2026)
 
