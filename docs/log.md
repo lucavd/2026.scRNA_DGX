@@ -2,6 +2,8 @@
 
 ## 2026-11-04
 
+- [correzioni di sostanza (S3)](steps/S3.md): preparate le 190 voci del piano per regione del testo ([Correzioni di S3 preparate per regione e applicate da script (D-17)](decisions/D-17.md)): 127 modifiche (81 senza scelta del PI, 46 in attesa), 483 ricevute rilette da script; anteprima con le raccomandazioni e confronto parola per parola in `manuscript/revisione_n2/S3/`; prove dal DGX e dal web in `results_v2/S3/evidence/`; cancelli G3 e G4 superati sull'anteprima, P1 e P4 confermate, P2 e P5 smentite e spiegate, P3 indeterminata senza effetto su conclusioni; dubbi rinviati a [figure scRNA (S4)](steps/S4.md), [taglio e stile (S6)](steps/S6.md) e [preparazione per Springer (S7)](steps/S7.md); report `reports/S3.html`. Step non chiuso: mancano le scelte del PI (titolo, abstract, altre 21 raccomandazioni); manoscritto ufficiale invariato.
+
 - [correzioni di sostanza (S3)](steps/S3.md) aperto: attese pre-registrate (5 cancelli, 5 previsioni) prima di ogni modifica al manoscritto; registrata la decisione tecnica [Correzioni di S3 preparate per regione e applicate da script (D-17)](decisions/D-17.md); manifest dei grezzi all'apertura: 921 file, 0 differenze.
 
 - [piano di implementazione (S2)](steps/S2.md) chiuso: misura dei vicini CPU con 1 e 100 thread sui dati del benchmark copiati dal DGX (cancelli superati; rapporto 1,16, 1,91, 2,48 a 10.000, 50.000, 100.000 cellule; tempi del DGX uguali a quelli a 1 thread); copia temporanea su micron cancellata; approvazione del PI nel file dello step; dubbi per [correzioni di sostanza (S3)](steps/S3.md) aggiornati.
