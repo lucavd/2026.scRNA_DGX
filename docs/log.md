@@ -2,6 +2,10 @@
 
 ## 2026-11-04
 
+- [integrazione spatial (S5)](steps/S5.md): Tables 8-10, didascalie di Fig. 7-9 e frasi spatial di Metodi, Risultati, Discussione e Conclusioni rifatte da `SPATIAL/results_v2` con `tools/s5_numbers.py` e `tools/s5_apply.py` (66 righe del piano nel diario); figure 7-9 rigenerate da `scripts/generate_spatial_figures.py` in PDF vettoriale; scelte del PI registrate in [Scelte del PI per l'integrazione spatial (D-20)](decisions/D-20.md); controllo indipendente `tools/s5_check.py` (129 valori e 65 controlli di testo, 0 discordanze); corretta nei Metodi l'affermazione sul ligando-recettore senza versione GPU; cancelli superati, P3-P5 confermate, P1 e P2 spiegate; report `reports/S5.html`.
+
+- [integrazione spatial (S5)](steps/S5.md) aperto: attese pre-registrate (4 cancelli, 5 previsioni), [Scelte del PI per l'integrazione spatial (D-20)](decisions/D-20.md), `tools/check_manifest_v2.py`; manifest dei grezzi all'apertura: 921 file, 0 differenze.
+
 - [figure scRNA (S4)](steps/S4.md) chiuso: il PI ha letto il riassunto senza dubbi nuovi (approvazione nel file dello step).
 
 - [figure scRNA (S4)](steps/S4.md): figure 1, 2, 5 e 6 rifatte da `scripts/generate_figures.py` in PDF vettoriale alle specifiche LNCS (al massimo 12,2 cm, testo di almeno 7 pt, leggibili in scala di grigi); figure multi-GPU 3 e 4 tolte e spostate in `figures/retired/` ([Multi-GPU ridotto a ciò che è stato misurato (D-02)](decisions/D-02.md)); didascalie di Fig. 1, 2, 5, 6 e Table 4 corrette (16 voci del piano nel diario); 2 righe in `arbitrati.csv` (R0351, R0373) e piano rigenerato; cancelli G1-G5 superati; P3 e P4 confermate, P1 e P2 indeterminate e spiegate, P5 smentita e rinviata al taglio; report `reports/S4.html`. Step in attesa della lettura del PI.
