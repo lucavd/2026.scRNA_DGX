@@ -135,3 +135,6 @@ SPATIAL/data/
 SPATIAL/results/*.csv
 
 .DS_Store
+
+# S2 intermediate PCA matrices (regenerable with tools/s2_neighbors_prep.py)
+results_v2/S2/neighbors*/pca_*.npy

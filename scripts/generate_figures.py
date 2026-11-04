@@ -1,46 +1,99 @@
 #!/usr/bin/env python3
-"""Generate publication-ready figures for GPU vs CPU scRNA-seq benchmark.
+"""Generate the scRNA-seq figures of the LNBI chapter at LNCS print size.
 
-Reads JSON result files from the results/ directory and produces:
-  1. Speedup heatmap (single-GPU vs CPU, per step × dataset size)
-  2. Multi-GPU scaling plot (wall time vs n_GPUs)
-  3. Concordance bar chart (ARI, NMI, HVG Jaccard from 10k data)
-  4. Memory profile (peak RAM / VRAM across dataset sizes)
-  5. Step-level timing breakdown (stacked bars)
+Figures (numbering of manuscript/full_paper_LNBI.md as of step S4; files keep
+their historical names until the renaming of step S7, plan entry R0735):
+
+  Figure 1  fig1_speedup_heatmap    per-step speedup, single GPU vs CPU
+  Figure 2  fig5_timing_breakdown   per-step wall time, CPU and single GPU
+  Figure 5  fig3_concordance        CPU-GPU concordance at 10,000 cells
+  Figure 6  fig4_memory_profile     peak RAM and aggregate VRAM
+
+The two multi-GPU figures (old Figures 3 and 4) are no longer produced
+(decision D-02 of the chapter).
+
+Inputs: only the main benchmark files
+    <results>/cpu_<N>_r<k>_results.json
+    <results>/gpu_<N>_r<k>_results.json        (1 GPU)
+    <results>/gpu<g>_<N>_r<k>_results.json     (g = 2, 4, 8 GPUs)
+and <results>/concordance_10000_r1.json. The stress-test (maxpower_*) and
+differential-expression benchmark files in the same folder are excluded by
+the file-name pattern, not by a later filter.
+
+Convention (decision D-15): every time and memory value is the mean of all
+five repeats with the sample SD (ddof = 1); a speedup is the ratio of the
+mean times. The first repeat is included.
+
+Print specification (LNCS): figure width at most 12.2 cm (the text width),
+all text at least 7 pt at print size, vector PDF with embedded TrueType
+fonts, PNG previews at 800 dpi. Include the PDFs at their natural size.
+
+Outputs in --output-dir: <name>.pdf and <name>.png for each figure,
+summary_table.csv; with --values-dir also figure_values.csv (every value
+drawn or printed in a figure), figure_styles.json (colours, markers and
+line styles per series, for the greyscale check) and figure_inputs_md5.tsv.
 
 Usage:
-    python scripts/generate_figures.py --results-dir results/ --output-dir figures/
-    python scripts/generate_figures.py --help
+    python scripts/generate_figures.py --results-dir results \
+        --output-dir figures --values-dir results_v2/S4
 """
 
 import argparse
+import csv
+import hashlib
 import json
+import re
 from pathlib import Path
-from typing import Any
 
-import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
-import numpy as np
-import pandas as pd
+import matplotlib
+
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt  # noqa: E402
+import matplotlib.ticker as mticker  # noqa: E402
+import numpy as np  # noqa: E402
+import pandas as pd  # noqa: E402
+from matplotlib.colors import LinearSegmentedColormap, Normalize, to_hex  # noqa: E402
+from matplotlib.lines import Line2D  # noqa: E402
 
 # ---------------------------------------------------------------------------
-# Global style
+# Print geometry and style
 # ---------------------------------------------------------------------------
+CM = 1 / 2.54
+TEXT_WIDTH_IN = 12.2 * CM          # LNCS text width (llncs.cls)
+MIN_PT = 7.0                       # smallest type size used anywhere
+
 plt.rcParams.update({
-    "font.family": "sans-serif",
-    "font.size": 9,
-    "axes.titlesize": 11,
-    "axes.labelsize": 10,
-    "xtick.labelsize": 8,
-    "ytick.labelsize": 8,
-    "legend.fontsize": 8,
-    "figure.dpi": 150,
-    "savefig.dpi": 300,
-    "savefig.bbox": "tight",
-    "savefig.pad_inches": 0.1,
+    "font.family": "DejaVu Sans",
+    "font.size": 7.5,
+    "axes.titlesize": 7.5,
+    "axes.labelsize": 7.5,
+    "xtick.labelsize": 7,
+    "ytick.labelsize": 7,
+    "legend.fontsize": 7,
+    "legend.title_fontsize": 7,
+    "axes.linewidth": 0.6,
+    "xtick.major.width": 0.6,
+    "ytick.major.width": 0.6,
+    "xtick.minor.width": 0.4,
+    "ytick.minor.width": 0.4,
+    "xtick.major.size": 2.5,
+    "ytick.major.size": 2.5,
+    "xtick.minor.size": 1.5,
+    "ytick.minor.size": 1.5,
+    "lines.linewidth": 1.0,
+    "lines.markersize": 3.5,
+    "pdf.fonttype": 42,            # embed TrueType fonts
+    "ps.fonttype": 42,
+    "svg.hashsalt": "lnbi-s4",
+    "savefig.dpi": 800,
+    "savefig.bbox": None,          # keep the declared figure size
+    "axes.spines.top": False,
+    "axes.spines.right": False,
 })
 
-# Colour palette — distinguishable, colour-blind friendly
+# One colour per pipeline, reused by every chapter figure (plan entry R0381).
+# Paul Tol "bright" palette; series are also told apart by marker and line
+# style so that the figures stay readable in greyscale (plan entry R0379).
 COLORS = {
     "cpu": "#4477AA",
     "gpu1": "#EE6677",
@@ -48,654 +101,454 @@ COLORS = {
     "gpu4": "#CCBB44",
     "gpu8": "#AA3377",
 }
+MARKERS = {"cpu": "o", "gpu1": "s", "gpu2": "^", "gpu4": "D", "gpu8": "v"}
+LINESTYLES = {"cpu": "-", "gpu1": "--", "gpu2": ":", "gpu4": "-.",
+              "gpu8": (0, (5, 1.5, 1, 1.5, 1, 1.5))}
+CONFIG_LABELS = {"cpu": "CPU", "gpu1": "1 GPU", "gpu2": "2 GPUs",
+                 "gpu4": "4 GPUs", "gpu8": "8 GPUs"}
 
-# Pipeline steps in execution order (for stacked bars and heatmap)
-COMMON_STEPS = [
+# Pipeline steps in execution order; names as in Table 1 of the chapter.
+STEPS = [
     "data_loading", "qc_filtering", "normalization", "hvg_selection",
     "pca", "neighbors", "leiden_0.5", "leiden_1.0", "leiden_1.5",
     "umap", "de_testing",
 ]
-
-# Pretty labels
 STEP_LABELS = {
     "data_loading": "Data loading",
-    "qc_filtering": "QC & filtering",
-    "normalization": "Normalization",
+    "qc_filtering": "QC and filtering",
+    "normalization": "Normalisation",
     "hvg_selection": "HVG selection",
     "pca": "PCA",
-    "neighbors": "Neighbors",
-    "leiden_0.5": "Leiden 0.5",
-    "leiden_1.0": "Leiden 1.0",
-    "leiden_1.5": "Leiden 1.5",
+    "neighbors": "Neighbour graph",
+    "leiden_0.5": "Leiden r = 0.5",
+    "leiden_1.0": "Leiden r = 1.0",
+    "leiden_1.5": "Leiden r = 1.5",
     "umap": "UMAP",
     "de_testing": "DE testing",
-    "gpu_transfer": "GPU transfer",
-    "scale": "Scale",
 }
-
-DATASET_SIZES = [10_000, 50_000, 100_000, 500_000, 1_300_000]
+SIZES_1GPU = [10_000, 50_000, 100_000]
+SIZES_ALL = [10_000, 50_000, 100_000, 500_000, 1_300_000]
 SIZE_LABELS = {10_000: "10k", 50_000: "50k", 100_000: "100k",
                500_000: "500k", 1_300_000: "1.3M"}
 
+RESULT_RE = re.compile(r"^(cpu|gpu\d*)_(\d+)_r(\d+)_results\.json$")
+N_REPEATS = 5
+
 # ---------------------------------------------------------------------------
-# Data loading helpers
+# Bookkeeping: every drawn value and every style goes to a file
+# ---------------------------------------------------------------------------
+VALUES: list[dict] = []
+STYLES: dict = {}
+INPUTS: dict[str, str] = {}
+
+
+def record(figure, panel, series, x, stat, value, n=None):
+    VALUES.append({"figure": figure, "panel": panel, "series": series,
+                   "x": x, "stat": stat, "value": repr(float(value)),
+                   "n": "" if n is None else n})
+
+
+def md5(path: Path) -> str:
+    h = hashlib.md5()
+    with open(path, "rb") as f:
+        for b in iter(lambda: f.read(1 << 20), b""):
+            h.update(b)
+    return h.hexdigest()
+
+
+def luminance(color) -> float:
+    """Greyscale value 0-255 (ITU-R BT.601, as PIL 'L')."""
+    r, g, b = matplotlib.colors.to_rgb(color)
+    return 255 * (0.299 * r + 0.587 * g + 0.114 * b)
+
+
+# ---------------------------------------------------------------------------
+# Data loading
 # ---------------------------------------------------------------------------
 
-def _prefix(pipeline: str, n_cells: int, n_gpus: int = 0) -> str:
-    """Build the file prefix used in result JSON filenames."""
-    if pipeline == "cpu":
-        return f"cpu_{n_cells}"
-    if n_gpus == 1:
-        return f"gpu_{n_cells}"
-    return f"gpu{n_gpus}_{n_cells}"
+def config_key(prefix: str) -> str:
+    """'cpu' -> cpu, 'gpu' -> gpu1, 'gpu8' -> gpu8."""
+    return "gpu1" if prefix == "gpu" else prefix
 
 
-def load_all_results(results_dir: Path) -> pd.DataFrame:
-    """Load every *_results.json into a flat DataFrame.
-
-    Each row is one (pipeline, n_cells, n_gpus, repeat) combination with
-    columns for every timing step, memory, and metadata fields.
-
-    Args:
-        results_dir: Path to the results/ directory.
-
-    Returns:
-        DataFrame indexed by (pipeline, n_cells, n_gpus, repeat).
-    """
-    rows: list[dict[str, Any]] = []
-
-    for jf in sorted(results_dir.glob("*_results.json")):
+def load_main_results(results_dir: Path) -> pd.DataFrame:
+    rows = []
+    for jf in sorted(results_dir.iterdir()):
+        m = RESULT_RE.match(jf.name)
+        if not m:
+            continue
+        prefix, n_cells, rep = m.group(1), int(m.group(2)), int(m.group(3))
         data = json.loads(jf.read_text())
         meta = data["metadata"]
-
-        row: dict[str, Any] = {
-            "pipeline": meta["pipeline"],
-            "n_cells": meta["n_cells_input"],
-            "n_gpus": meta.get("n_gpus", 0),
-            "repeat": meta.get("repeat_id", 1),
-            "total_time": data["timings"].get("total", np.nan),
-            "peak_ram_gb": data["memory"]["peak_ram_gb"],
-            "peak_vram_gb": data["memory"]["peak_vram_gb"],
-        }
-
-        # Individual step timings
-        for step in COMMON_STEPS:
-            row[f"t_{step}"] = data["timings"].get(step, np.nan)
-
-        # Multi-GPU extra steps
-        for extra in ("gpu_transfer", "scale"):
-            row[f"t_{extra}"] = data["timings"].get(extra, np.nan)
-
+        assert meta["n_cells_input"] == n_cells, jf
+        assert meta.get("repeat_id") == rep, jf
+        INPUTS[str(jf)] = md5(jf)
+        row = {"config": config_key(prefix), "n_cells": n_cells, "repeat": rep,
+               "n_gpus": meta.get("n_gpus", 0), "pipeline": meta["pipeline"],
+               "total": data["timings"]["total"],
+               "peak_ram_gb": data["memory"]["peak_ram_gb"],
+               "peak_vram_gb": data["memory"]["peak_vram_gb"]}
+        for s in STEPS:
+            row[s] = data["timings"].get(s, np.nan)
         rows.append(row)
-
     df = pd.DataFrame(rows)
-    print(f"Loaded {len(df)} result files from {results_dir}")
+    counts = df.groupby(["config", "n_cells"]).size()
+    bad = counts[counts != N_REPEATS]
+    if len(bad):
+        raise SystemExit(f"configurations without {N_REPEATS} repeats: {bad.to_dict()}")
+    print(f"Loaded {len(df)} main benchmark files "
+          f"({len(counts)} configurations x {N_REPEATS} repeats)")
     return df
 
 
-def load_concordance(results_dir: Path) -> dict | None:
-    """Load concordance JSON for 10k repeat 1 (the only one with full data)."""
-    path = results_dir / "concordance_10000_r1.json"
-    if path.exists():
-        return json.loads(path.read_text())
-    return None
+def sub(df, config, n_cells):
+    s = df[(df["config"] == config) & (df["n_cells"] == n_cells)]
+    assert len(s) == N_REPEATS, (config, n_cells, len(s))
+    return s
 
 
-def _mean_std(series: pd.Series) -> tuple[float, float]:
-    """Return (mean, std) for a pandas Series, handling NaN."""
-    return float(series.mean()), float(series.std(ddof=1)) if len(series) > 1 else 0.0
+def mean_sd(x: pd.Series) -> tuple[float, float]:
+    return float(x.mean()), float(x.std(ddof=1))
 
 
 # ---------------------------------------------------------------------------
-# Figure 1: Speedup heatmap — single GPU vs CPU
+# Saving
 # ---------------------------------------------------------------------------
+
+def save(fig, output_dir: Path, name: str) -> None:
+    fig.savefig(output_dir / f"{name}.pdf",
+                metadata={"CreationDate": None, "ModDate": None,
+                          "Producer": None, "Creator": None})
+    fig.savefig(output_dir / f"{name}.png", dpi=800,
+                metadata={"Software": None})
+    plt.close(fig)
+    print(f"  {name}: pdf and png saved")
+
+
+# ---------------------------------------------------------------------------
+# Figure 1: speedup heatmap
+# ---------------------------------------------------------------------------
+
+def speedup_cmap(lo: float, hi: float) -> LinearSegmentedColormap:
+    """Diverging map on log10(speedup) between lo and hi: orange below 1,
+    white at 1, blues above 1. The white node sits at the position of 1 on a
+    proportional log scale, so equal ratios take equal lengths of the
+    colour bar; luminance falls monotonically from 1 towards both ends and
+    the high end is much darker than the low end."""
+    f = (0.0 - np.log10(lo)) / (np.log10(hi) - np.log10(lo))
+    up = [(0.0, "#F7F7F7"), (0.3, "#C6DBEF"), (0.6, "#6BAED6"),
+          (0.8, "#2171B5"), (1.0, "#08306B")]
+    nodes = [(0.0, "#E66101")] + [(f + (1 - f) * p, c) for p, c in up]
+    return LinearSegmentedColormap.from_list("speedup", nodes)
+
+
+def rel_lum(rgb) -> float:
+    def lin(c):
+        return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+    r, g, b = (lin(c) for c in rgb[:3])
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def contrast(rgb1, rgb2) -> float:
+    l1, l2 = sorted((rel_lum(rgb1), rel_lum(rgb2)), reverse=True)
+    return (l1 + 0.05) / (l2 + 0.05)
+
+
+def fmt_speedup(v: float) -> str:
+    if v >= 100:
+        return f"{v:.0f}"
+    if v >= 10:
+        return f"{v:.1f}"
+    return f"{v:.2f}"
+
 
 def fig_speedup_heatmap(df: pd.DataFrame, output_dir: Path) -> None:
-    """Heatmap: rows = pipeline steps, cols = dataset sizes.
+    fid = "fig1_speedup_heatmap"
+    mat = np.full((len(STEPS), len(SIZES_1GPU)), np.nan)
+    for j, n in enumerate(SIZES_1GPU):
+        cpu, gpu = sub(df, "cpu", n), sub(df, "gpu1", n)
+        for i, s in enumerate(STEPS):
+            mat[i, j] = cpu[s].mean() / gpu[s].mean()
+            record(fid, "main", STEP_LABELS[s], n, "speedup_ratio_of_means", mat[i, j], N_REPEATS)
 
-    Cell value = CPU_mean_time / GPU_mean_time (speedup factor).
-    Only for single-GPU (n_gpus == 1) vs CPU.
-    """
-    # Sizes where single GPU exists
-    gpu1_sizes = sorted(df.loc[df["n_gpus"] == 1, "n_cells"].unique())
+    lo, hi = 0.3, 400.0             # fixed colour limits, cover 0.36-329
+    assert np.nanmin(mat) > lo and np.nanmax(mat) < hi
+    norm = Normalize(vmin=np.log10(lo), vmax=np.log10(hi))
+    cmap = speedup_cmap(lo, hi)
 
-    steps = COMMON_STEPS
-    matrix = np.full((len(steps), len(gpu1_sizes)), np.nan)
-
-    for j, size in enumerate(gpu1_sizes):
-        cpu = df[(df["pipeline"] == "cpu_scanpy") & (df["n_cells"] == size)]
-        gpu = df[(df["n_gpus"] == 1) & (df["n_cells"] == size)]
-        if cpu.empty or gpu.empty:
-            continue
-        for i, step in enumerate(steps):
-            cpu_mean = cpu[f"t_{step}"].mean()
-            gpu_mean = gpu[f"t_{step}"].mean()
-            if gpu_mean > 0:
-                matrix[i, j] = cpu_mean / gpu_mean
-
-    fig, ax = plt.subplots(figsize=(4.5, 5.5))
-
-    # Custom colormap: red (<1 = GPU slower), white (1), blue (>1 = GPU faster)
-    from matplotlib.colors import TwoSlopeNorm
-    vmin = np.nanmin(matrix[matrix > 0]) if np.any(matrix > 0) else 0.1
-    vmax = np.nanmax(matrix)
-    norm = TwoSlopeNorm(vmin=vmin, vcenter=1.0, vmax=vmax)
-
-    im = ax.imshow(matrix, aspect="auto", cmap="RdYlBu", norm=norm)
-
-    # Annotate cells
-    for i in range(len(steps)):
-        for j in range(len(gpu1_sizes)):
-            val = matrix[i, j]
-            if np.isnan(val):
-                ax.text(j, i, "—", ha="center", va="center", fontsize=8,
-                        color="gray")
-            else:
-                color = "white" if val > vmax * 0.7 or val < 0.3 else "black"
-                label = f"{val:.1f}×" if val >= 10 else f"{val:.2f}×"
-                ax.text(j, i, label, ha="center", va="center", fontsize=7.5,
-                        fontweight="bold", color=color)
-
-    ax.set_xticks(range(len(gpu1_sizes)))
-    ax.set_xticklabels([SIZE_LABELS[s] for s in gpu1_sizes])
-    ax.set_yticks(range(len(steps)))
-    ax.set_yticklabels([STEP_LABELS.get(s, s) for s in steps])
+    fig = plt.figure(figsize=(8.4 * CM, 8.0 * CM))
+    ax = fig.add_axes([0.30, 0.11, 0.42, 0.86])
+    cax = fig.add_axes([0.76, 0.11, 0.035, 0.86])
+    mesh = ax.pcolormesh(np.log10(mat), cmap=cmap, norm=norm,
+                         edgecolors="white", linewidth=0.6)
+    cells = []
+    for i in range(mat.shape[0]):
+        for j in range(mat.shape[1]):
+            v = mat[i, j]
+            bg = cmap(norm(np.log10(v)))
+            black, white = contrast(bg, (0, 0, 0)), contrast(bg, (1, 1, 1))
+            tc = "black" if black >= white else "white"
+            ax.text(j + 0.5, i + 0.5, fmt_speedup(v), ha="center", va="center",
+                    fontsize=7, color=tc)
+            cells.append({"step": STEPS[i], "n_cells": SIZES_1GPU[j], "value": v,
+                          "cell_color": to_hex(bg), "text_color": tc,
+                          "contrast": max(black, white),
+                          "luminance": luminance(bg)})
+    ax.set_xlim(0, mat.shape[1]); ax.set_ylim(mat.shape[0], 0)
+    ax.set_xticks(np.arange(mat.shape[1]) + 0.5)
+    ax.set_xticklabels([SIZE_LABELS[n] for n in SIZES_1GPU])
+    ax.set_yticks(np.arange(mat.shape[0]) + 0.5)
+    ax.set_yticklabels([STEP_LABELS[s] for s in STEPS])
+    ax.tick_params(length=0)
+    for sp in ax.spines.values():
+        sp.set_visible(False)
     ax.set_xlabel("Dataset size (cells)")
 
-    cbar = fig.colorbar(im, ax=ax, shrink=0.6, label="Speedup (CPU time / GPU time)")
-
-    fig.savefig(output_dir / "fig1_speedup_heatmap.png")
-    plt.close(fig)
-    print("  Figure 1: speedup heatmap saved")
-
-
-# ---------------------------------------------------------------------------
-# Figure 2: Multi-GPU scaling plot
-# ---------------------------------------------------------------------------
-
-def fig_scaling_plot(df: pd.DataFrame, output_dir: Path) -> None:
-    """Line plot: x = n_GPUs, y = total wall time. One line per dataset size."""
-    fig, ax = plt.subplots(figsize=(6, 4.5))
-
-    # All GPU configs
-    gpu_configs = sorted(df.loc[df["n_gpus"] > 0, "n_gpus"].unique())
-    all_sizes = sorted(df["n_cells"].unique())
-
-    markers = ["o", "s", "D", "^", "v"]
-    cmap = plt.cm.viridis(np.linspace(0.15, 0.85, len(all_sizes)))
-
-    for idx, size in enumerate(all_sizes):
-        gpus_for_size = []
-        means = []
-        stds = []
-        for ng in gpu_configs:
-            subset = df[(df["n_gpus"] == ng) & (df["n_cells"] == size)]
-            if subset.empty:
-                continue
-            m, s = _mean_std(subset["total_time"])
-            gpus_for_size.append(ng)
-            means.append(m)
-            stds.append(s)
-
-        if not gpus_for_size:
-            continue
-
-        means_arr = np.array(means)
-        stds_arr = np.array(stds)
-
-        ax.errorbar(gpus_for_size, means_arr, yerr=stds_arr,
-                     marker=markers[idx % len(markers)],
-                     color=cmap[idx], label=f"{SIZE_LABELS[size]} (GPU)",
-                     linewidth=1.5, markersize=5, capsize=3)
-
-    # Add CPU reference as separate markers at x=0 position
-    for idx, size in enumerate(all_sizes):
-        cpu_sub = df[(df["pipeline"] == "cpu_scanpy") & (df["n_cells"] == size)]
-        if cpu_sub.empty:
-            continue
-        cpu_mean = cpu_sub["total_time"].mean()
-        ax.axhline(y=cpu_mean, color=cmap[idx], linestyle=":", alpha=0.3,
-                    linewidth=0.7)
-
-    # Build a second legend for CPU lines
-    from matplotlib.lines import Line2D
-    cpu_handles = []
-    for idx, size in enumerate(all_sizes):
-        cpu_sub = df[(df["pipeline"] == "cpu_scanpy") & (df["n_cells"] == size)]
-        if not cpu_sub.empty:
-            cpu_handles.append(Line2D([0], [0], color=cmap[idx], linestyle=":",
-                                       alpha=0.5, label=f"{SIZE_LABELS[size]} (CPU)"))
-
-    ax.set_xlabel("Number of GPUs")
-    ax.set_ylabel("Total wall time (seconds)")
-    ax.set_yscale("log")
-    ax.set_xticks(gpu_configs)
-    ax.set_xticklabels([str(g) for g in gpu_configs])
-
-    # Combined legend inside plot area
-    handles1, labels1 = ax.get_legend_handles_labels()
-    all_handles = handles1 + cpu_handles
-    all_labels = labels1 + [h.get_label() for h in cpu_handles]
-    ax.legend(all_handles, all_labels, fontsize=7, loc="center right",
-              ncol=1, framealpha=0.9)
-
-    ax.grid(True, alpha=0.3, which="both")
-    ax.set_xlim(0.5, max(gpu_configs) + 0.5)
-
-    fig.tight_layout()
-    fig.savefig(output_dir / "fig2_scaling_plot.png")
-    plt.close(fig)
-    print("  Figure 2: scaling plot saved")
+    cb = fig.colorbar(mesh, cax=cax)
+    # matplotlib rasterises colour-bar solids above 50 levels; keep vector
+    cb.solids.set_rasterized(False)
+    ticks = [0.5, 1, 10, 100]
+    cb.set_ticks(np.log10(ticks))
+    cb.set_ticklabels(["0.5", "1", "10", "100"])
+    cb.minorticks_off()
+    cb.outline.set_linewidth(0.6)
+    cb.set_label("Speedup (CPU time / GPU time)")
+    STYLES[fid] = {"heatmap_cells": cells, "colour_limits": [lo, hi],
+                   "colourbar_ticks": ticks}
+    save(fig, output_dir, fid)
 
 
 # ---------------------------------------------------------------------------
-# Figure 3: Concordance bar chart
-# ---------------------------------------------------------------------------
-
-def fig_concordance(concordance: dict, output_dir: Path) -> None:
-    """Grouped bar chart: ARI, NMI, HVG Jaccard for each Leiden resolution."""
-    cluster = concordance["cluster_concordance"]
-    hvg_j = concordance["hvg_concordance"]["jaccard"]
-    pca_rho = concordance["pca_concordance"]["mean_abs_spearman_rho"]
-    knn_j = concordance.get("knn_concordance", {}).get("mean_jaccard", np.nan)
-
-    resolutions = ["leiden_0.5", "leiden_1.0", "leiden_1.5"]
-    ari_vals = [cluster[r]["ari"] for r in resolutions]
-    nmi_vals = [cluster[r]["nmi"] for r in resolutions]
-
-    fig, axes = plt.subplots(1, 2, figsize=(8, 3.5), gridspec_kw={"width_ratios": [3, 2]})
-
-    # Left panel: ARI and NMI per resolution
-    ax = axes[0]
-    x = np.arange(len(resolutions))
-    w = 0.35
-    bars1 = ax.bar(x - w / 2, ari_vals, w, label="ARI", color="#4477AA", edgecolor="white")
-    bars2 = ax.bar(x + w / 2, nmi_vals, w, label="NMI", color="#EE6677", edgecolor="white")
-
-    for bars in [bars1, bars2]:
-        for bar in bars:
-            h = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width() / 2, h + 0.005,
-                    f"{h:.3f}", ha="center", va="bottom", fontsize=7)
-
-    ax.set_xticks(x)
-    ax.set_xticklabels(["res=0.5", "res=1.0", "res=1.5"])
-    ax.set_ylim(0.85, 1.02)
-    ax.set_ylabel("Score")
-    ax.legend(loc="lower left")
-    ax.axhline(1.0, color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
-
-    # Right panel: other metrics
-    ax2 = axes[1]
-    metrics = ["HVG\nJaccard", "PCA\nSpearman |ρ|", "kNN\nJaccard"]
-    values = [hvg_j, pca_rho, knn_j]
-    colors = ["#228833", "#CCBB44", "#66CCEE"]
-    bars = ax2.bar(metrics, values, color=colors, edgecolor="white", width=0.6)
-    for bar, val in zip(bars, values):
-        if not np.isnan(val):
-            ax2.text(bar.get_x() + bar.get_width() / 2, val + 0.005,
-                     f"{val:.3f}", ha="center", va="bottom", fontsize=7)
-    ax2.set_ylim(0.85, 1.05)
-    ax2.axhline(1.0, color="gray", linestyle="--", linewidth=0.5, alpha=0.5)
-
-    fig.tight_layout()
-    fig.savefig(output_dir / "fig3_concordance.png")
-    plt.close(fig)
-    print("  Figure 3: concordance chart saved")
-
-
-# ---------------------------------------------------------------------------
-# Figure 4: Memory profile
-# ---------------------------------------------------------------------------
-
-def fig_memory_profile(df: pd.DataFrame, output_dir: Path) -> None:
-    """Peak RAM (CPU) and peak VRAM (GPU) across dataset sizes."""
-    fig, axes = plt.subplots(1, 2, figsize=(8, 3.5))
-
-    # --- Left: Peak RAM ---
-    ax = axes[0]
-    configs = [
-        ("cpu_scanpy", 0, "CPU (100 cores)", COLORS["cpu"]),
-        ("gpu_rapids", 1, "1× GPU", COLORS["gpu1"]),
-    ]
-    # Add multi-GPU
-    for ng, label, col in [(2, "2× GPU", COLORS["gpu2"]),
-                            (4, "4× GPU", COLORS["gpu4"]),
-                            (8, "8× GPU", COLORS["gpu8"])]:
-        configs.append((f"gpu_rapids_{ng}gpu", ng, label, col))
-
-    for pipe, ng, label, color in configs:
-        sizes_plot = []
-        means = []
-        for size in DATASET_SIZES:
-            if ng == 0:
-                sub = df[(df["pipeline"] == pipe) & (df["n_cells"] == size)]
-            elif ng == 1:
-                sub = df[(df["n_gpus"] == ng) & (df["n_cells"] == size)]
-            else:
-                sub = df[(df["n_gpus"] == ng) & (df["n_cells"] == size)]
-            if sub.empty:
-                continue
-            sizes_plot.append(size)
-            means.append(sub["peak_ram_gb"].mean())
-        if sizes_plot:
-            ax.plot(sizes_plot, means, marker="o", label=label, color=color,
-                    linewidth=1.5, markersize=4)
-
-    ax.set_xscale("log")
-    ax.set_xlabel("Dataset size (cells)")
-    ax.set_ylabel("Peak RAM (GB)")
-    ax.legend(fontsize=7)
-    ax.grid(True, alpha=0.3)
-    ax.xaxis.set_major_formatter(mticker.FuncFormatter(
-        lambda x, _: SIZE_LABELS.get(int(x), f"{int(x/1000)}k")))
-
-    # --- Right: Peak VRAM ---
-    ax2 = axes[1]
-    for pipe, ng, label, color in configs[1:]:  # skip CPU (no VRAM)
-        sizes_plot = []
-        means = []
-        for size in DATASET_SIZES:
-            if ng == 1:
-                sub = df[(df["n_gpus"] == ng) & (df["n_cells"] == size)]
-            else:
-                sub = df[(df["n_gpus"] == ng) & (df["n_cells"] == size)]
-            if sub.empty:
-                continue
-            sizes_plot.append(size)
-            means.append(sub["peak_vram_gb"].mean())
-        if sizes_plot:
-            ax2.plot(sizes_plot, means, marker="s", label=label, color=color,
-                     linewidth=1.5, markersize=4)
-
-    # H100 VRAM limit reference
-    ax2.axhline(y=79.6, color="red", linestyle="--", linewidth=0.8, alpha=0.5)
-    ax2.text(DATASET_SIZES[0], 80.5, "H100 80 GB VRAM limit", fontsize=7,
-             color="red", alpha=0.7)
-
-    ax2.set_xscale("log")
-    ax2.set_xlabel("Dataset size (cells)")
-    ax2.set_ylabel("Peak VRAM (GB)")
-    ax2.legend(fontsize=7)
-    ax2.grid(True, alpha=0.3)
-    ax2.xaxis.set_major_formatter(mticker.FuncFormatter(
-        lambda x, _: SIZE_LABELS.get(int(x), f"{int(x/1000)}k")))
-
-    fig.tight_layout()
-    fig.savefig(output_dir / "fig4_memory_profile.png")
-    plt.close(fig)
-    print("  Figure 4: memory profile saved")
-
-
-# ---------------------------------------------------------------------------
-# Figure 5: Step-level timing breakdown (stacked bars)
+# Figure 2: per-step wall time, CPU and single GPU on separate axes
 # ---------------------------------------------------------------------------
 
 def fig_timing_breakdown(df: pd.DataFrame, output_dir: Path) -> None:
-    """Stacked bar charts: time per step for CPU vs GPU at each dataset size.
-
-    One panel per dataset size (where both CPU and single-GPU exist).
-    """
-    # Sizes with both CPU and single-GPU data
-    gpu1_sizes = sorted(df.loc[df["n_gpus"] == 1, "n_cells"].unique())
-
-    n_panels = len(gpu1_sizes)
-    fig, axes = plt.subplots(1, n_panels + 1, figsize=(3 * n_panels + 2.5, 4.2),
-                              sharey=False,
-                              gridspec_kw={"width_ratios": [1] * n_panels + [0.6]})
-    if n_panels == 1:
-        axes = list(axes)
-
-    step_colors = plt.cm.Set3(np.linspace(0, 1, len(COMMON_STEPS)))
-
-    for panel_idx, size in enumerate(gpu1_sizes):
-        ax = axes[panel_idx]
-        cpu_sub = df[(df["pipeline"] == "cpu_scanpy") & (df["n_cells"] == size)]
-        gpu_sub = df[(df["n_gpus"] == 1) & (df["n_cells"] == size)]
-
-        cpu_means = [cpu_sub[f"t_{s}"].mean() for s in COMMON_STEPS]
-        gpu_means = [gpu_sub[f"t_{s}"].mean() for s in COMMON_STEPS]
-
-        # Stacked bars
-        cpu_bottom = 0.0
-        gpu_bottom = 0.0
-        for i, step in enumerate(COMMON_STEPS):
-            cpu_h = cpu_means[i] if not np.isnan(cpu_means[i]) else 0
-            gpu_h = gpu_means[i] if not np.isnan(gpu_means[i]) else 0
-            label = STEP_LABELS.get(step, step) if panel_idx == 0 else None
-            ax.bar(0, cpu_h, bottom=cpu_bottom, color=step_colors[i],
-                   edgecolor="white", linewidth=0.3, width=0.6, label=label)
-            ax.bar(1, gpu_h, bottom=gpu_bottom, color=step_colors[i],
-                   edgecolor="white", linewidth=0.3, width=0.6)
-            cpu_bottom += cpu_h
-            gpu_bottom += gpu_h
-
-        # Leave headroom for total labels
-        y_max = max(cpu_bottom, gpu_bottom)
-        ax.set_ylim(0, y_max * 1.12)
-
-        ax.text(0, cpu_bottom + y_max * 0.02, f"{cpu_bottom:.0f}s",
-                ha="center", va="bottom", fontsize=7, fontweight="bold")
-        ax.text(1, gpu_bottom + y_max * 0.02, f"{gpu_bottom:.0f}s",
-                ha="center", va="bottom", fontsize=7, fontweight="bold")
-
-        ax.set_xticks([0, 1])
-        ax.set_xticklabels(["CPU", "1\u00d7 GPU"], fontsize=8)
-        ax.set_xlabel(f"{SIZE_LABELS[size]} cells", fontsize=9)
-        if panel_idx == 0:
-            ax.set_ylabel("Wall time (seconds)")
-
-    # Legend in the extra rightmost panel (invisible axes)
-    ax_leg = axes[-1]
-    ax_leg.set_axis_off()
-    handles, labels = axes[0].get_legend_handles_labels()
-    ax_leg.legend(handles, labels, loc="center left", fontsize=7,
-                  title="Pipeline step", title_fontsize=8, frameon=False)
-
-    fig.tight_layout()
-    fig.subplots_adjust(wspace=0.35)
-    fig.savefig(output_dir / "fig5_timing_breakdown.png")
-    plt.close(fig)
-    print("  Figure 5: timing breakdown saved")
+    fid = "fig5_timing_breakdown"
+    # Sequential palette (viridis), dark at the bottom of the stack and light
+    # at the top: luminance grows with the step order, so the stack order can
+    # be read in greyscale against the legend.
+    cols = [plt.cm.viridis(x) for x in np.linspace(0.0, 0.97, len(STEPS))]
+    fig = plt.figure(figsize=(TEXT_WIDTH_IN, 6.0 * CM))
+    axes = [fig.add_axes([0.11, 0.16, 0.24, 0.74]),
+            fig.add_axes([0.44, 0.16, 0.24, 0.74])]
+    for ax, cfg, title in zip(axes, ["cpu", "gpu1"],
+                              ["CPU (Scanpy)", "1 GPU (rapids-singlecell)"]):
+        tops = []
+        for k, n in enumerate(SIZES_1GPU):
+            s = sub(df, cfg, n)
+            bottom = 0.0
+            for i, st in enumerate(STEPS):
+                h = float(s[st].mean())
+                record(fid, cfg, STEP_LABELS[st], n, "mean_s", h, N_REPEATS)
+                ax.bar(k, h, bottom=bottom, width=0.62, color=cols[i],
+                       edgecolor="white", linewidth=0.3)
+                bottom += h
+            record(fid, cfg, "stack_total", n, "sum_of_step_means_s", bottom, N_REPEATS)
+            tops.append(bottom)
+        ymax = max(tops) * 1.13
+        ax.set_ylim(0, ymax)
+        for k, t in enumerate(tops):
+            ax.text(k, t + ymax * 0.015, f"{t:.0f} s" if t >= 10 else f"{t:.1f} s",
+                    ha="center", va="bottom", fontsize=7)
+        ax.set_xticks(range(len(SIZES_1GPU)))
+        ax.set_xticklabels([SIZE_LABELS[n] for n in SIZES_1GPU])
+        ax.set_xlabel("Dataset size (cells)")
+        ax.set_title(title, loc="left", pad=3)
+    axes[0].set_ylabel("Wall time (s)")
+    handles = [matplotlib.patches.Patch(facecolor=cols[i], edgecolor="white",
+                                        linewidth=0.3, label=STEP_LABELS[s])
+               for i, s in enumerate(STEPS)][::-1]   # top of stack first
+    fig.legend(handles=handles, loc="center left", bbox_to_anchor=(0.71, 0.53),
+               frameon=False, handlelength=1.2, handleheight=0.9,
+               labelspacing=0.28, borderaxespad=0.0)
+    STYLES[fid] = {"stacked": [{"step": s, "order": i, "color": to_hex(cols[i]),
+                                "luminance": luminance(cols[i])}
+                               for i, s in enumerate(STEPS)]}
+    save(fig, output_dir, fid)
 
 
 # ---------------------------------------------------------------------------
-# Bonus: Figure 6 — Multi-GPU timing breakdown for large datasets
+# Figure 5: concordance dot plot
 # ---------------------------------------------------------------------------
 
-def fig_multigpu_breakdown(df: pd.DataFrame, output_dir: Path) -> None:
-    """Stacked bars for multi-GPU configs on 500k and 1.3M cells.
+def fig_concordance(conc: dict, output_dir: Path) -> None:
+    fid = "fig3_concordance"
+    cl = conc["cluster_concordance"]
+    res = ["leiden_0.5", "leiden_1.0", "leiden_1.5"]
+    ari = [cl[r]["ari"] for r in res]
+    nmi = [cl[r]["nmi"] for r in res]
+    others = [("HVG\nJaccard", conc["hvg_concordance"]["jaccard"]),
+              ("PCA\n|\u03c1|", conc["pca_concordance"]["mean_abs_spearman_rho"]),
+              ("kNN\nJaccard", conc["knn_concordance"]["mean_jaccard"]),
+              ("DE logFC\n\u03c1", conc["de_concordance"]["mean_spearman_rho"])]
+    knn_cap = 15 / 16
 
-    Shows CPU steps vs GPU steps to illustrate why multi-GPU scaling is flat.
-    """
-    large_sizes = [s for s in [500_000, 1_300_000]
-                   if not df[(df["n_gpus"] >= 2) & (df["n_cells"] == s)].empty]
-    if not large_sizes:
-        print("  Figure 6: skipped (no multi-GPU large dataset results)")
-        return
+    fig = plt.figure(figsize=(TEXT_WIDTH_IN, 5.2 * CM))
+    ax1 = fig.add_axes([0.10, 0.20, 0.38, 0.66])
+    ax2 = fig.add_axes([0.60, 0.20, 0.38, 0.66], sharey=ax1)
+    ylim = (0.80, 1.012)
+    x = np.arange(3)
+    series = {"ARI": dict(marker="o", color="black", mfc="black", dx=-0.15,
+                          ha="right", tx=-0.11),
+              "NMI": dict(marker="s", color="black", mfc="white", dx=+0.15,
+                          ha="left", tx=+0.11)}
+    for name, vals in (("ARI", ari), ("NMI", nmi)):
+        st = series[name]
+        ax1.plot(x + st["dx"], vals, linestyle="none", marker=st["marker"],
+                 color=st["color"], mfc=st["mfc"], mew=0.8, ms=4, label=name)
+        for xi, v, r in zip(x, vals, res):
+            record(fid, "clustering", name, r, "value", v)
+            ax1.text(xi + st["dx"] + st["tx"], v, f"{v:.3f}", ha=st["ha"],
+                     va="center", fontsize=7)
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(["r = 0.5", "r = 1.0", "r = 1.5"])
+    ax1.set_xlim(-0.5, 2.5)
+    ax1.set_xlabel("Leiden resolution")
+    ax1.set_ylabel("Agreement (ARI, NMI)")
+    ax1.legend(loc="lower left", bbox_to_anchor=(0.0, 1.0), ncol=2,
+               frameon=False, borderaxespad=0.2, handletextpad=0.3,
+               columnspacing=1.0)
 
-    gpu_configs = sorted(df.loc[df["n_gpus"] >= 2, "n_gpus"].unique())
-
-    # Steps split into phases
-    cpu_phase = ["data_loading", "qc_filtering", "normalization", "hvg_selection"]
-    transfer_phase = ["gpu_transfer", "scale"]
-    multigpu_phase = ["pca", "neighbors"]
-    singlegpu_phase = ["leiden_0.5", "leiden_1.0", "leiden_1.5", "umap", "de_testing"]
-
-    phases = [
-        ("CPU preprocessing", cpu_phase, "#4477AA"),
-        ("GPU transfer + scale", transfer_phase, "#BBBBBB"),
-        ("Multi-GPU (PCA, neighbors)", multigpu_phase, "#EE6677"),
-        ("Single-GPU (leiden, UMAP, DE)", singlegpu_phase, "#228833"),
-    ]
-
-    n_panels = len(large_sizes)
-    fig, axes = plt.subplots(1, n_panels + 1, figsize=(4 * n_panels + 2.5, 4.2),
-                              sharey=False,
-                              gridspec_kw={"width_ratios": [1] * n_panels + [0.7]})
-
-    for panel_idx, size in enumerate(large_sizes):
-        ax = axes[panel_idx]
-
-        cpu_sub = df[(df["pipeline"] == "cpu_scanpy") & (df["n_cells"] == size)]
-        cpu_total = cpu_sub["total_time"].mean() if not cpu_sub.empty else 0
-
-        x_pos = list(range(len(gpu_configs)))
-        x_labels = [f"{ng}\u00d7 GPU" for ng in gpu_configs]
-
-        if cpu_total > 0:
-            x_pos = list(range(len(gpu_configs) + 1))
-            x_labels = ["CPU\n(100 cores)"] + x_labels
-
-        bottoms = [0.0] * len(x_pos)
-        for phase_name, phase_steps, phase_color in phases:
-            heights = []
-            if cpu_total > 0:
-                if phase_name.startswith("CPU"):
-                    h = sum(cpu_sub[f"t_{s}"].mean() for s in COMMON_STEPS
-                            if not np.isnan(cpu_sub[f"t_{s}"].mean()))
-                    heights.append(h)
-                else:
-                    heights.append(0)
-
-            for ng in gpu_configs:
-                sub = df[(df["n_gpus"] == ng) & (df["n_cells"] == size)]
-                if sub.empty:
-                    heights.append(0)
-                    continue
-                h = 0
-                for s in phase_steps:
-                    col = f"t_{s}"
-                    if col in sub.columns:
-                        val = sub[col].mean()
-                        if not np.isnan(val):
-                            h += val
-                heights.append(h)
-
-            ax.bar(x_pos, heights, bottom=bottoms, color=phase_color,
-                   edgecolor="white", linewidth=0.3, width=0.6,
-                   label=phase_name if panel_idx == 0 else None)
-            bottoms = [b + h for b, h in zip(bottoms, heights)]
-
-        # Total labels — above each bar, with enough room
-        y_max = max(bottoms)
-        ax.set_ylim(0, y_max * 1.12)
-        for xp, total in zip(x_pos, bottoms):
-            # Format large numbers with comma separator
-            if total >= 1000:
-                label = f"{total:,.0f}s"
-            else:
-                label = f"{total:.0f}s"
-            ax.text(xp, total + y_max * 0.02, label,
-                    ha="center", va="bottom", fontsize=7, fontweight="bold")
-
-        ax.set_xticks(x_pos)
-        ax.set_xticklabels(x_labels, fontsize=7.5)
-        ax.set_xlabel(f"{SIZE_LABELS[size]} cells", fontsize=9)
-        if panel_idx == 0:
-            ax.set_ylabel("Wall time (seconds)")
-
-    # Legend in rightmost panel
-    ax_leg = axes[-1]
-    ax_leg.set_axis_off()
-    handles, labels = axes[0].get_legend_handles_labels()
-    ax_leg.legend(handles, labels, loc="center left", fontsize=7,
-                  title="Phase", title_fontsize=8, frameon=False)
-
-    fig.tight_layout()
-    fig.subplots_adjust(wspace=0.35)
-    fig.savefig(output_dir / "fig6_multigpu_breakdown.png")
-    plt.close(fig)
-    print("  Figure 6: multi-GPU breakdown saved")
+    x2 = np.arange(len(others))
+    vals2 = [v for _, v in others]
+    ax2.plot(x2, vals2, linestyle="none", marker="D", color="black", ms=4)
+    for xi, (lab, v) in zip(x2, others):
+        record(fid, "other", lab.replace("\n", " "), "", "value", v)
+        ax2.text(xi, v - 0.009, f"{v:.3f}", ha="center", va="top", fontsize=7)
+    k = 2  # kNN position
+    ax2.hlines(knn_cap, k - 0.36, k + 0.36, colors="0.35", linestyles=(0, (2, 1.2)),
+               linewidth=0.8)
+    ax2.text(k, knn_cap + 0.003, "max 0.9375", ha="center", va="bottom",
+             fontsize=7, color="0.25")
+    record(fid, "other", "kNN Jaccard ceiling", "", "value", knn_cap)
+    ax2.set_xticks(x2)
+    ax2.set_xticklabels([lab for lab, _ in others])
+    ax2.set_xlim(-0.5, len(others) - 0.4)
+    ax2.set_ylabel("Agreement (Jaccard, Spearman)")
+    ax2.tick_params(labelleft=True)
+    for ax in (ax1, ax2):
+        ax.set_ylim(*ylim)
+        ax.yaxis.set_major_locator(mticker.MultipleLocator(0.05))
+        ax.axhline(1.0, color="0.6", linewidth=0.5, linestyle=(0, (1, 1)), zorder=0)
+    STYLES[fid] = {"series": {"clustering": [
+        {"name": n, "marker": series[n]["marker"], "fill": series[n]["mfc"],
+         "linestyle": "none", "color": series[n]["color"]} for n in series],
+        "other": [{"name": lab.replace("\n", " "), "x_position": i}
+                  for i, (lab, _) in enumerate(others)]},
+        "ylim": ylim}
+    save(fig, output_dir, fid)
 
 
 # ---------------------------------------------------------------------------
-# Summary table (CSV export for the paper)
+# Figure 6: memory profile
+# ---------------------------------------------------------------------------
+
+def fig_memory_profile(df: pd.DataFrame, output_dir: Path) -> None:
+    fid = "fig4_memory_profile"
+    configs = ["cpu", "gpu1", "gpu2", "gpu4", "gpu8"]
+    dodge = {c: 10 ** (0.05 * k) for c, k in zip(configs, [-2, -1, 0, 1, 2])}
+    fig = plt.figure(figsize=(TEXT_WIDTH_IN, 5.6 * CM))
+    ax1 = fig.add_axes([0.095, 0.19, 0.38, 0.64])
+    ax2 = fig.add_axes([0.595, 0.19, 0.38, 0.64])
+    styles = []
+    for c in configs:
+        sizes = [n for n in SIZES_ALL
+                 if not df[(df["config"] == c) & (df["n_cells"] == n)].empty]
+        for ax, col, panel in ((ax1, "peak_ram_gb", "ram"), (ax2, "peak_vram_gb", "vram")):
+            if panel == "vram" and c == "cpu":
+                continue
+            m, s = zip(*[mean_sd(sub(df, c, n)[col]) for n in sizes])
+            for n, mi, si in zip(sizes, m, s):
+                record(fid, panel, c, n, "mean_gib", mi, N_REPEATS)
+                record(fid, panel, c, n, "sd_gib", si, N_REPEATS)
+            ax.errorbar([n * dodge[c] for n in sizes], m, yerr=s,
+                        color=COLORS[c], marker=MARKERS[c], linestyle=LINESTYLES[c],
+                        mfc=COLORS[c] if c in ("cpu", "gpu2", "gpu8") else "white",
+                        mew=0.8, ms=3.5, linewidth=0.9, capsize=1.5,
+                        elinewidth=0.6, capthick=0.6)
+        styles.append({"config": c, "color": COLORS[c], "marker": MARKERS[c],
+                       "linestyle": str(LINESTYLES[c]),
+                       "filled": c in ("cpu", "gpu2", "gpu8")})
+    for ax in (ax1, ax2):
+        ax.set_xscale("log")
+        ax.set_xticks(SIZES_ALL)
+        ax.set_xticklabels([SIZE_LABELS[n] for n in SIZES_ALL])
+        ax.xaxis.set_minor_locator(mticker.NullLocator())
+        ax.set_xlim(6_500, 2_100_000)
+        ax.set_xlabel("Dataset size (cells)")
+        ax.grid(True, axis="y", linewidth=0.4, alpha=0.4)
+    ax1.set_yscale("log")
+    ax1.yaxis.set_major_formatter(mticker.FuncFormatter(lambda v, _: f"{v:g}"))
+    ax1.set_ylabel("Peak CPU RAM (GiB)")
+    ax2.set_ylim(0, None)
+    ax2.set_ylabel("Peak aggregate VRAM (GiB)")
+    handles = [Line2D([0], [0], color=COLORS[c], marker=MARKERS[c],
+                      linestyle=LINESTYLES[c], linewidth=0.9, ms=3.5, mew=0.8,
+                      mfc=COLORS[c] if c in ("cpu", "gpu2", "gpu8") else "white",
+                      label=CONFIG_LABELS[c]) for c in configs]
+    fig.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.53, 1.0),
+               ncol=5, frameon=False, handlelength=2.6, columnspacing=1.2,
+               borderaxespad=0.2)
+    STYLES[fid] = {"series": styles}
+    save(fig, output_dir, fid)
+
+
+# ---------------------------------------------------------------------------
+# Summary table (same columns as the historical figures/summary_table.csv)
 # ---------------------------------------------------------------------------
 
 def export_summary_table(df: pd.DataFrame, output_dir: Path) -> None:
-    """Export a CSV summary table with mean ± std for each configuration."""
     rows = []
-    for (pipe, ncells, ngpus), grp in df.groupby(["pipeline", "n_cells", "n_gpus"]):
-        m_time, s_time = _mean_std(grp["total_time"])
-        m_ram = grp["peak_ram_gb"].mean()
-        m_vram = grp["peak_vram_gb"].mean()
-        n_reps = len(grp)
-        rows.append({
-            "pipeline": pipe,
-            "n_cells": ncells,
-            "n_gpus": ngpus,
-            "n_repeats": n_reps,
-            "total_time_mean_s": round(m_time, 1),
-            "total_time_std_s": round(s_time, 1),
-            "peak_ram_gb": round(m_ram, 1),
-            "peak_vram_gb": round(m_vram, 1),
-        })
-
-    summary = pd.DataFrame(rows).sort_values(["n_cells", "n_gpus", "pipeline"])
-    summary.to_csv(output_dir / "summary_table.csv", index=False)
-    print(f"  Summary table: {len(summary)} rows saved to summary_table.csv")
+    for (pipe, n, g), grp in df.groupby(["pipeline", "n_cells", "n_gpus"]):
+        m, s = mean_sd(grp["total"])
+        rows.append({"pipeline": pipe, "n_cells": n, "n_gpus": g,
+                     "n_repeats": len(grp),
+                     "total_time_mean_s": round(m, 1),
+                     "total_time_std_s": round(s, 1),
+                     "peak_ram_gb": round(grp["peak_ram_gb"].mean(), 1),
+                     "peak_vram_gb": round(grp["peak_vram_gb"].mean(), 1)})
+    out = pd.DataFrame(rows).sort_values(["n_cells", "n_gpus", "pipeline"])
+    out.to_csv(output_dir / "summary_table.csv", index=False)
+    print(f"  summary_table.csv: {len(out)} rows")
 
 
 # ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
-
-def parse_args() -> argparse.Namespace:
-    """Parse command-line arguments."""
-    parser = argparse.ArgumentParser(
-        description="Generate publication-ready figures for GPU vs CPU benchmark.",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    parser.add_argument(
-        "--results-dir", type=str, default="results",
-        help="Directory containing benchmark JSON files (default: results/)",
-    )
-    parser.add_argument(
-        "--output-dir", type=str, default="figures",
-        help="Directory for output figures (default: figures/)",
-    )
-    return parser.parse_args()
-
 
 def main() -> None:
-    """Main entry point."""
-    args = parse_args()
-    results_dir = Path(args.results_dir)
-    output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    ap = argparse.ArgumentParser(description=__doc__,
+                                 formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--results-dir", default="results")
+    ap.add_argument("--output-dir", default="figures")
+    ap.add_argument("--values-dir", default=None,
+                    help="where to write figure_values.csv, figure_styles.json "
+                         "and figure_inputs_md5.tsv")
+    a = ap.parse_args()
+    rd, od = Path(a.results_dir), Path(a.output_dir)
+    od.mkdir(parents=True, exist_ok=True)
 
-    print(f"Loading results from: {results_dir}")
-    df = load_all_results(results_dir)
+    df = load_main_results(rd)
+    conc_path = rd / "concordance_10000_r1.json"
+    INPUTS[str(conc_path)] = md5(conc_path)
+    conc = json.loads(conc_path.read_text())
 
-    if df.empty:
-        print("ERROR: No result files found.")
-        raise SystemExit(1)
+    fig_speedup_heatmap(df, od)
+    fig_timing_breakdown(df, od)
+    fig_concordance(conc, od)
+    fig_memory_profile(df, od)
+    export_summary_table(df, od)
 
-    print(f"\nDataset sizes: {sorted(df['n_cells'].unique())}")
-    print(f"Pipelines: {sorted(df['pipeline'].unique())}")
-    print(f"GPU configs: {sorted(df['n_gpus'].unique())}")
-    print(f"Total runs: {len(df)}")
-
-    print("\n--- Generating figures ---")
-
-    fig_speedup_heatmap(df, output_dir)
-    fig_scaling_plot(df, output_dir)
-
-    concordance = load_concordance(results_dir)
-    if concordance:
-        fig_concordance(concordance, output_dir)
-    else:
-        print("  Figure 3: SKIPPED (no concordance_10000_r1.json)")
-
-    fig_memory_profile(df, output_dir)
-    fig_timing_breakdown(df, output_dir)
-    fig_multigpu_breakdown(df, output_dir)
-
-    print("\n--- Exporting summary table ---")
-    export_summary_table(df, output_dir)
-
-    print(f"\nDone! All figures saved to: {output_dir}/")
+    if a.values_dir:
+        vd = Path(a.values_dir)
+        vd.mkdir(parents=True, exist_ok=True)
+        with open(vd / "figure_values.csv", "w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=list(VALUES[0]))
+            w.writeheader(); w.writerows(VALUES)
+        (vd / "figure_styles.json").write_text(json.dumps(STYLES, indent=1, default=float))
+        with open(vd / "figure_inputs_md5.tsv", "w") as f:
+            f.write("path\tmd5\n")
+            for p in sorted(INPUTS):
+                f.write(f"{p}\t{INPUTS[p]}\n")
+        print(f"  {len(VALUES)} values, {len(INPUTS)} input files recorded in {vd}")
 
 
 if __name__ == "__main__":

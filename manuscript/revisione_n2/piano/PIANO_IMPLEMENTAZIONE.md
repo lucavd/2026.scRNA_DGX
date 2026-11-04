@@ -2129,12 +2129,13 @@ Il livello misura la difficoltà, non la precedenza: l'ordine di lavoro è nella
 - **Bersaglio:** prosa (riga 221); registro: MISMATCH, major
 - **Ancora (univoca nel .md):** `On CPU, DE testing and neighbour graph construction dominate; on GPU, all steps complete in seconds`
 - **Valore:** DE testing and neighbour graph construction dominate → UMAP
-- **Istruzione:** Didascalia di Figure 2 (riga 221): sostituire "On CPU, DE testing and neighbour graph construction dominate; on GPU, all steps complete in seconds." con "On CPU, DE testing and UMAP dominate; on GPU, every step takes less than 7 s." Nella figura (fig5_timing_breakdown.png) rendere visibili le barre GPU: pannello GPU separato o asse logaritmico.
+- **Istruzione:** Didascalia di Figure 2 (riga 221): sostituire "On CPU, DE testing and neighbour graph construction dominate; on GPU, all steps complete in seconds." con "On CPU, DE testing and UMAP dominate; on GPU, the longest step, DE testing at 100k cells, takes 6.4 s on average." Nella figura (fig5_timing_breakdown.png) rendere visibili le barre GPU: pannello GPU separato o asse logaritmico.
 - **Decisione o convenzione:** CONV
 - **Fonte:** revisione_n2_log.csv id=R0351 campo recomputed (results/cpu_{10000,50000,100000}_r*.json timings; c02_fig2_timing_breakdown.py; step GPU piu lungo 6.4 s)
 - **Dipende da:** CONV; R0377
 - **Assorbe:** R0113
 - **Nota:** Quote CPU (100k): DE 86.9%, UMAP 7.5%, neighbours 1.4%. R0113 assorbita.
+- **Modificata in arbitrato:** instruction (vedi `arbitrati.csv`)
 
 #### R0376 · S4 · P14 (figure) · correggere
 - **Bersaglio:** fig:fig3_concordance.png (riga 246); registro: MISMATCH, minor
@@ -2157,10 +2158,11 @@ Il livello misura la difficoltà, non la precedenza: l'ordine di lavoro è nella
 #### R0373 · S4 · P14 (figure) · correggere
 - **Bersaglio:** fig:fig4_memory_profile.png (riga 254); registro: MISMATCH, minor
 - **Ancora (univoca nel .md):** `**Figure 6.** Peak memory usage across dataset sizes`
-- **Istruzione:** In Figure 6 aggiungere barre (min-max o SD sulle 5 ripetizioni) ai punti di VRAM e RAM, e separare le linee 2x e 4x GPU del pannello sinistro (coincidono a 60.7 GB a 1.3M). In didascalia aggiungere: "All repeats of a configuration ran in one process, so VRAM grows from the first to later repeats."
+- **Istruzione:** In Figure 6 aggiungere barre (min-max o SD sulle 5 ripetizioni) ai punti di VRAM e RAM, e separare le linee 2x e 4x GPU del pannello sinistro (coincidono a 60.7 GB a 1.3M). In didascalia aggiungere: "All repeats of a configuration ran in one process; in the multi-GPU runs VRAM grew from the first to later repeats."
 - **Fonte:** revisione_n2_log.csv id=R0373 campo recomputed (results/gpu{2,4,8}_{N}_r*.json memory.peak_vram_gb; slurm/gpu_8.sh)
 - **Dipende da:** R0359; R0377
 - **Nota:** peak_vram_gb 8 GPU a 1.3M: r1 93.71 GB, r2-r5 135.31-150.92 GB; il 134.2 del testo e' la media.
+- **Modificata in arbitrato:** instruction (vedi `arbitrati.csv`)
 
 #### R0254 · S5 · P4 (spatial) · superata-da-S1
 - **Bersaglio:** prosa (riga 14); registro: UNSUPPORTED, critical
