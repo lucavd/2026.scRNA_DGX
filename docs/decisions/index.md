@@ -26,3 +26,4 @@
 * [Titolo e abstract nuovi del capitolo: opzione A (D-18)](D-18.md) - Il capitolo prende il titolo A e l'abstract A (247 parole) proposti nelle correzioni di sostanza (S3).
 * [Scelte di contenuto di S3: approvate le 21 raccomandazioni (D-19)](D-19.md) - Il PI approva le raccomandazioni delle correzioni di sostanza (S3) per le 21 scelte diverse da titolo e abstract.
 * [Scelte del PI per l'integrazione spatial (D-20)](D-20.md) - Speedup della sola co-occorrenza come informazione, totali completi a Visium HD 8 µm in Table 8 e Fig. 7, controllo con la CPU del server in una colonna di Table 8 e una frase.
+* [Taglio a 15 pagine LNCS con un documento supplementare su Zenodo (D-21)](D-21.md) - Il capitolo resta a circa 15 pagine LNCS (13-17): testo principale con circa 3.000 parole di prosa, Tables 4 e 8, Figures 1, 5, 8 e 9; il resto in un documento supplementare archiviato su Zenodo con il repository.

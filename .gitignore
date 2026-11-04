@@ -138,3 +138,9 @@ SPATIAL/results/*.csv
 
 # S2 intermediate PCA matrices (regenerable with tools/s2_neighbors_prep.py)
 results_v2/S2/neighbors*/pca_*.npy
+
+# S6 page-count builds: keep only receipts and PDFs
+results_v2/S6/pages/**
+!results_v2/S6/pages/**/
+!results_v2/S6/pages/**/*.json
+!results_v2/S6/pages/baseline/paper.pdf
