@@ -25,3 +25,4 @@
 * [Vicini CPU a 1 thread: si dichiara e si misura (D-16)](D-16.md) - I Metodi dicono che la ricerca dei vicini CPU usava pynndescent con n_jobs = 1 (default di Scanpy); l'effetto si misura sul server libero confrontando n_jobs = 1 e 100.
 * [Titolo e abstract nuovi del capitolo: opzione A (D-18)](D-18.md) - Il capitolo prende il titolo A e l'abstract A (247 parole) proposti nelle correzioni di sostanza (S3).
 * [Scelte di contenuto di S3: approvate le 21 raccomandazioni (D-19)](D-19.md) - Il PI approva le raccomandazioni delle correzioni di sostanza (S3) per le 21 scelte diverse da titolo e abstract.
+* [Scelte del PI per l'integrazione spatial (D-20)](D-20.md) - Speedup della sola co-occorrenza come informazione, totali completi a Visium HD 8 µm in Table 8 e Fig. 7, controllo con la CPU del server in una colonna di Table 8 e una frase.

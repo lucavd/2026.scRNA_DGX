@@ -5,6 +5,6 @@
 * [Piano di implementazione (S2)](S2.md) - Piano di implementazione delle correzioni della revisione n.2, con la proposta di convenzione unica sulle ripetizioni e il controllo dei thread nei run CPU dello scRNA.
 * [Correzioni di sostanza (S3)](S3.md) - Applica al manoscritto le 190 voci di sostanza del piano della revisione n.2 e prepara per il PI le scelte di contenuto (titolo, abstract e le altre elencate nella testa del piano).
 * [Figure 1-6 alle specifiche LNCS (S4)](S4.md) - Figure scRNA del capitolo (Fig. 1, 2, 5, 6) rigenerate da script alle specifiche LNCS; tolte le due figure multi-GPU; didascalie corrette secondo il piano.
-* [Integrazione dei risultati spatial (S5)](S5.md) - Integrazione dei risultati spatial del capitolo; per ora contiene i dubbi ricevuti dagli step precedenti.
+* [Integrazione dei risultati spatial (S5)](S5.md) - Tables 8, 9 e 10, figure 7-9 e frasi spatial del capitolo rifatte dai risultati del nuovo riferimento spatial (SPATIAL/results_v2), con script e controllo indipendente.
 * [Taglio e revisione di stile (S6)](S6.md) - Taglio a circa 15 pagine LNCS e revisione di stile; per ora contiene i dubbi ricevuti dagli step precedenti.
 * [LaTeX, METEOR e verifica finale (S7)](S7.md) - Sorgente LaTeX llncs, compilazione, verifica finale e pacchetto METEOR; per ora contiene i dubbi ricevuti dagli step precedenti.
