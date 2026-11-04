@@ -2,6 +2,8 @@
 
 ## 2026-11-04
 
+- [correzioni di sostanza (S3)](steps/S3.md) chiuso: il PI sceglie titolo A e abstract A ([Titolo e abstract nuovi del capitolo: opzione A (D-18)](decisions/D-18.md)) e approva le altre 21 raccomandazioni ([Scelte di contenuto di S3: approvate le 21 raccomandazioni (D-19)](decisions/D-19.md)); 127 modifiche applicate al manoscritto (md5 09df07d2b8713da7385612991fb1d7df, identico all'anteprima) e alla bibliografia; cancelli G1-G5 superati; diario `IMPL_diario.csv` con 190 voci; rinvii a S4, S6 e S7.
+
 - [correzioni di sostanza (S3)](steps/S3.md): preparate le 190 voci del piano per regione del testo ([Correzioni di S3 preparate per regione e applicate da script (D-17)](decisions/D-17.md)): 127 modifiche (81 senza scelta del PI, 46 in attesa), 483 ricevute rilette da script; anteprima con le raccomandazioni e confronto parola per parola in `manuscript/revisione_n2/S3/`; prove dal DGX e dal web in `results_v2/S3/evidence/`; cancelli G3 e G4 superati sull'anteprima, P1 e P4 confermate, P2 e P5 smentite e spiegate, P3 indeterminata senza effetto su conclusioni; dubbi rinviati a [figure scRNA (S4)](steps/S4.md), [taglio e stile (S6)](steps/S6.md) e [preparazione per Springer (S7)](steps/S7.md); report `reports/S3.html`. Step non chiuso: mancano le scelte del PI (titolo, abstract, altre 21 raccomandazioni); manoscritto ufficiale invariato.
 
 - [correzioni di sostanza (S3)](steps/S3.md) aperto: attese pre-registrate (5 cancelli, 5 previsioni) prima di ogni modifica al manoscritto; registrata la decisione tecnica [Correzioni di S3 preparate per regione e applicate da script (D-17)](decisions/D-17.md); manifest dei grezzi all'apertura: 921 file, 0 differenze.

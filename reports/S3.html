@@ -3063,6 +3063,8 @@ vertical-align: -.125em;
   <li><a href="#cancelli-e-previsioni" id="toc-cancelli-e-previsioni" class="nav-link" data-scroll-target="#cancelli-e-previsioni">Cancelli e previsioni</a></li>
   <li><a href="#dubbi-e-come-si-sono-chiusi" id="toc-dubbi-e-come-si-sono-chiusi" class="nav-link" data-scroll-target="#dubbi-e-come-si-sono-chiusi">Dubbi e come si sono chiusi</a></li>
   <li><a href="#dubbi-rinviati" id="toc-dubbi-rinviati" class="nav-link" data-scroll-target="#dubbi-rinviati">Dubbi rinviati</a></li>
+  <li><a href="#decisioni-del-pi" id="toc-decisioni-del-pi" class="nav-link" data-scroll-target="#decisioni-del-pi">Decisioni del PI</a></li>
+  <li><a href="#stato" id="toc-stato" class="nav-link" data-scroll-target="#stato">Stato</a></li>
   <li><a href="#cosa-è-girato" id="toc-cosa-è-girato" class="nav-link" data-scroll-target="#cosa-è-girato">Cosa è girato</a></li>
   <li><a href="#appendice-da-dove-vengono-i-numeri-del-riassunto" id="toc-appendice-da-dove-vengono-i-numeri-del-riassunto" class="nav-link" data-scroll-target="#appendice-da-dove-vengono-i-numeri-del-riassunto">Appendice: da dove vengono i numeri del riassunto</a></li>
   </ul>
@@ -3360,32 +3362,32 @@ vertical-align: -.125em;
 <tr class="odd">
 <td>G1</td>
 <td>manifest dei grezzi con 0 differenze all’inizio e alla fine</td>
-<td>inizio: 921 file, 0 differenze (<code>results_v2/S3/manifest_check_start.json</code>); fine: alla chiusura</td>
-<td>superato all’inizio; il controllo finale si ripete alla chiusura</td>
+<td>inizio e fine: 921 file, 0 differenze (<code>results_v2/S3/manifest_check_start.json</code>, <code>manifest_check_end.json</code>)</td>
+<td>superato</td>
 </tr>
 <tr class="even">
 <td>G2</td>
 <td>una riga di diario per ognuna delle 190 voci primarie, con esito valido</td>
-<td>190 righe, nessuna mancante o doppia; 109 fatte, 5 decise diversamente, 2 rimandate con step e motivo, 74 in attesa delle scelte del PI</td>
-<td>in sospeso: si valuta dopo le scelte</td>
+<td>190 righe in <code>IMPL_diario.csv</code>, nessuna mancante o doppia: 183 fatte (74 dopo le scelte del PI), 5 decise diversamente, 2 rimandate con step e motivo</td>
+<td>superato</td>
 </tr>
 <tr class="odd">
 <td>G3</td>
 <td>ogni numero inserito con ricevuta riletta da script, 0 discordanze</td>
 <td>483 ricevute in quattro regioni; tutte ricalcolate da <code>valori_R0.py</code> … <code>valori_R4.py</code> sul server (14 dalle prove copiate in <code>results_v2/S3/evidence/</code>); 0 discordanze (<code>manuscript/revisione_n2/S3/check_preview.json</code>)</td>
-<td>superato sull’anteprima; si ripete sul testo finale</td>
+<td>superato sul manoscritto finale (<code>manuscript/revisione_n2/S3/check_final.json</code>)</td>
 </tr>
 <tr class="even">
 <td>G4</td>
 <td>ancore univoche, nessuna sovrapposizione, niente U+2013/U+2014, chiavi in bibliografia, pandoc</td>
 <td>127 modifiche, 0 errori di ancora o di sovrapposizione; 0 lineette; tutte le chiavi presenti; pandoc senza errori</td>
-<td>superato sull’anteprima; si ripete sul testo finale</td>
+<td>superato sul manoscritto finale</td>
 </tr>
 <tr class="odd">
 <td>G5</td>
 <td>nessuna voce che dipende da una scelta del PI entra prima della decisione</td>
-<td>il manoscritto ufficiale non è cambiato (md5 4587032be8d2905007687e0bb50d848e); le 46 modifiche con scelta restano in attesa</td>
-<td>superato finora</td>
+<td>le scelte sono registrate in Titolo e abstract nuovi del capitolo: opzione A (D-18) e Scelte di contenuto di S3: approvate le 21 raccomandazioni (D-19) prima dell’applicazione; manoscritto da 4587032be8d2905007687e0bb50d848e a 09df07d2b8713da7385612991fb1d7df, identico all’anteprima letta dal PI</td>
+<td>superato</td>
 </tr>
 <tr class="even">
 <td>P1</td>
@@ -3436,16 +3438,24 @@ vertical-align: -.125em;
 <h1>Dubbi rinviati</h1>
 <ul>
 <li>A figure scRNA (S4): le didascalie di Fig. 2, 5 e 6 citate dalla regione Risultati (vicini CPU a 1 thread per D-16 nella Fig. 2).</li>
-<li>Al taglio e allo stile (S6): il corpo del capitolo è di 11.518 parole dopo le correzioni (previsione P5 smentita); servono circa 15 pagine LNCS. Cosa serve per chiuderlo: il taglio pianificato in S6, partendo dai Metodi (+1.451 parole in S3).</li>
-<li>Alla preparazione per Springer (S7): correggere <code>SPATIAL/scripts/download_spatial_data.py</code> (dataset FFPE, Space Ranger 3.0.0) e annotare che <code>slurm/gpu_8.sh</code> è stato portato a 200 CPU dopo i run a 8 GPU (eseguiti con 100); release, commit e DOI d’archivio (scelta REPO_DOI).</li>
+<li>Al taglio e stile (S6): il corpo del capitolo è di 11.518 parole dopo le correzioni (previsione P5 smentita); servono circa 15 pagine LNCS. Cosa serve per chiuderlo: il taglio pianificato in S6, partendo dai Metodi (+1.451 parole in S3).</li>
+<li>Alla preparazione per Springer (S7): conferma con il referente HPC della formula CONVECS per i run su UPSCALE; eventuale nome dello strumento nella frase sull’uso di LLM (la frase approvata non nomina un prodotto); correggere <code>SPATIAL/scripts/download_spatial_data.py</code> (dataset FFPE, Space Ranger 3.0.0) e annotare che <code>slurm/gpu_8.sh</code> è stato portato a 200 CPU dopo i run a 8 GPU (eseguiti con 100); release, commit e DOI d’archivio (scelta REPO_DOI).</li>
 </ul>
+</section>
+<section id="decisioni-del-pi" class="level1">
+<h1>Decisioni del PI</h1>
+<p>Il 4 novembre 2026 il PI ha scelto titolo A e abstract A (Titolo e abstract nuovi del capitolo: opzione A (D-18)) e ha approvato le altre 21 raccomandazioni (Scelte di contenuto di S3: approvate le 21 raccomandazioni (D-19)). Le 127 modifiche sono state applicate in un solo passaggio con <code>tools/s3_apply.py</code>; il manoscritto risultante (md5 09df07d2b8713da7385612991fb1d7df) è identico all’anteprima del report, e la bibliografia passa a md5 0545ef29119d63866360fb950ce29c11.</p>
+</section>
+<section id="stato" class="level1">
+<h1>Stato</h1>
+<p>Chiuso. Cancelli G1-G5 superati sul manoscritto finale; P1 e P4 confermate; P2 e P5 smentite, con ogni discordanza corretta e la lunghezza rinviata al taglio; P3 indeterminata senza effetto su conclusioni. Nessun dubbio aperto: i rinvii sono scritti nei file di figure scRNA (S4), taglio e stile (S6) e preparazione per Springer (S7).</p>
 </section>
 <section id="cosa-è-girato" class="level1">
 <h1>Cosa è girato</h1>
 <ul>
 <li>Commit di partenza: <code>fc9c11c</code> (pre-registrazione). Manoscritto all’apertura: md5 4587032be8d2905007687e0bb50d848e, invariato.</li>
 <li>Preparazione per regione del testo (fronte e introduzione; Metodi; Risultati scRNA; Discussione, parti finali e bibliografia) secondo D-17 (Correzioni di S3 preparate per regione e applicate da script): file <code>edits_R*.csv</code>, <code>ricevute_R*.csv</code>, <code>valori_R*.py</code>, <code>diario_R*.csv</code>, <code>scelte_R*.md</code>, <code>arbitrati_R*.csv</code> in <code>manuscript/revisione_n2/S3/</code>; 15 correzioni di integrazione registrate in <code>integrazione.csv</code>.</li>
-<li>Script: <code>tools/s3_p3_neighbors.py</code> (previsione P3), <code>tools/s3_apply.py</code> (applicazione in un passaggio, ancore univoche, confini di regione), <code>tools/s3_check.py</code> (G2-G4, P1, P5). Anteprima: md5 09df07d2b8713da7385612991fb1d7df (<code>manuscript/revisione_n2/S3/anteprima/</code>).</li>
+<li>Script: <code>tools/s3_p3_neighbors.py</code> (previsione P3), <code>tools/s3_apply.py</code> (applicazione in un passaggio, ancore univoche, confini di regione), <code>tools/s3_check.py</code> (G2-G4, P1, P5). Anteprima e manoscritto finale: md5 09df07d2b8713da7385612991fb1d7df (identici).</li>
 <li>Prove copiate dal DGX e dal web in <code>results_v2/S3/evidence/</code> e <code>results_v2/S3/R2_dgx_evidence/</code> (log SLURM, sacct, record Crossref, passaggio CONVECS, firma di <code>rsc.tl.leiden</code>), con <code>MD5SUMS.txt</code>.</li>
 <li>Nessuna misura di tempi in questo step. Durante la preparazione il server era condiviso con le metanalisi di simulomicsr (load average circa 32 alle 18:02, Tctl 69,6 °C): non tocca nessun risultato di S3.</li>
 </ul>

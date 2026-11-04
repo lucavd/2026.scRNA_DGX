@@ -23,3 +23,5 @@
 
 * [Convenzione unica sulle ripetizioni: media e SD di tutte e 5 (D-15)](D-15.md) - In tutto il capitolo, scRNA e spatial, i tempi sono media e SD campionaria delle 5 ripetizioni e lo speedup è il rapporto fra medie.
 * [Vicini CPU a 1 thread: si dichiara e si misura (D-16)](D-16.md) - I Metodi dicono che la ricerca dei vicini CPU usava pynndescent con n_jobs = 1 (default di Scanpy); l'effetto si misura sul server libero confrontando n_jobs = 1 e 100.
+* [Titolo e abstract nuovi del capitolo: opzione A (D-18)](D-18.md) - Il capitolo prende il titolo A e l'abstract A (247 parole) proposti nelle correzioni di sostanza (S3).
+* [Scelte di contenuto di S3: approvate le 21 raccomandazioni (D-19)](D-19.md) - Il PI approva le raccomandazioni delle correzioni di sostanza (S3) per le 21 scelte diverse da titolo e abstract.
