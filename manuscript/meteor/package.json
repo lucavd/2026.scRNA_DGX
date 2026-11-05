@@ -7,9 +7,9 @@
   "figures/fig2.pdf": "fde366b542fbec8703d05a1faa59f0b7",
   "figures/fig3.pdf": "0ea87f0200b2e1166d0f440ecfe18911",
   "figures/fig4.pdf": "cb87da4824c069dcf644344acb9b4d69",
-  "full_paper_LNBI.pdf": "bf8fff0558049e39218ac2310217f60d",
-  "full_paper_LNBI_source.zip": "e9e845d0f7db77785bbc741b2051c25e",
-  "zenodo/supplementary_LNBI.pdf": "ce22e9d7631beab52222defc7df87768"
+  "full_paper_LNBI.pdf": "b5ead2779e0f1a1081268cae056b3b68",
+  "full_paper_LNBI_source.zip": "4471822d223697feaa1103af486a4e35",
+  "zenodo/supplementary_LNBI.pdf": "c16b5052ae522e26e4173fbb5444dd4f"
  },
  "zip_contents": [
   "aliascnt.sty",
@@ -24,7 +24,7 @@
   "splncs04.bst"
  ],
  "clean_build": {
-  "dir": "/tmp/lnbi_meteor_hihak5pq",
+  "dir": "/tmp/lnbi_meteor_4njqw35l",
   "commands": [
    [
     "pdflatex -interaction=nonstopmode full_paper_LNBI.tex",

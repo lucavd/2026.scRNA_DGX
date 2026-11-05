@@ -1,5 +1,7 @@
 # 2026.scRNA_DGX
 
+> Working repository. The cleaned release that accompanies the LNBI chapter is <https://github.com/lucavd/scRNA-DGX-benchmark> (v1.0.0), archived on Zenodo with DOI 10.5281/zenodo.23984290.
+
 GPU-accelerated single-cell and spatial transcriptomics benchmark on NVIDIA DGX H100, comparing the CPU-based Scanpy stack against rapids-singlecell (GPU) for speed, biological concordance, and scale. Companion repository for the CIBB 2026 short paper and for its extended chapter in Springer LNBI (`manuscript/full_paper_LNBI.md`, LaTeX in `manuscript/lncs_latex/`, Supplementary Material in `manuscript/supplementary_LNBI.md`).
 
 Key findings, as reported in the LNBI chapter (every value is re-read from the result files by the scripts in `tools/`):

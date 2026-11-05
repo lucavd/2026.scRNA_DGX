@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) (preloaded format=pdflatex 2025.4.29)  5 NOV 2026 14:04
+This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) (preloaded format=pdflatex 2025.4.29)  5 NOV 2026 17:11
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -557,7 +557,7 @@ Underfull \hbox (badness 1221) in paragraph at lines 240--244
 
 
 [9]
-<figures/figS1.pdf, id=172, 347.12363pt x 170.71654pt>
+<figures/figS1.pdf, id=173, 347.12363pt x 170.71654pt>
 File: figures/figS1.pdf Graphic file (type pdf)
 <use figures/figS1.pdf>
 Package pdftex.def Info: figures/figS1.pdf  used on input line 261.
@@ -567,19 +567,19 @@ Package pdftex.def Info: figures/figS1.pdf  used on input line 261.
 [10]
 
 [11 <./figures/figS1.pdf>]
-<figures/figS2.pdf, id=203, 347.12363pt x 159.33543pt>
+
+[12]
+<figures/figS2.pdf, id=212, 347.12363pt x 159.33543pt>
 File: figures/figS2.pdf Graphic file (type pdf)
 <use figures/figS2.pdf>
 Package pdftex.def Info: figures/figS2.pdf  used on input line 284.
 (pdftex.def)             Requested size: 347.12277pt x 159.33502pt.
 
 
-[12]
-
 [13 <./figures/figS2.pdf>] [14] [15]
 
 [16]
-<figures/figS3.pdf, id=260, 347.12363pt x 159.33543pt>
+<figures/figS3.pdf, id=261, 347.12363pt x 159.33543pt>
 File: figures/figS3.pdf Graphic file (type pdf)
 <use figures/figS3.pdf>
 Package pdftex.def Info: figures/figS3.pdf  used on input line 436.
@@ -622,10 +622,10 @@ Here is how much of TeX's memory you used:
  14 hyphenation exceptions out of 8191
  75i,9n,79p,3137b,616s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmbx10.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmbx12.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmbx9.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmmi10.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmmi7.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmmi9.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmr10.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmr6.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmr7.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmr9.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmri10.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmri9.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmsy10.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmsy9.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmtt10.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmtt9.pfb>
-Output written on supplementary_LNBI.pdf (24 pages, 429182 bytes).
+Output written on supplementary_LNBI.pdf (24 pages, 429991 bytes).
 PDF statistics:
- 503 PDF objects out of 1000 (max. 8388607)
- 383 compressed objects within 4 object streams
+ 504 PDF objects out of 1000 (max. 8388607)
+ 384 compressed objects within 4 object streams
  118 named destinations out of 1000 (max. 500000)
  24 words of extra memory for PDF output out of 10000 (max. 10000000)
 

@@ -1,8 +1,8 @@
 {
  "tag": "supplement",
- "at": "2026-11-05T14:04:17+01:00",
+ "at": "2026-11-05T17:11:30+01:00",
  "src": "manuscript/supplementary_LNBI.md",
- "src_md5": "5c995b115134dc41dc46f17d64be7823",
+ "src_md5": "b4ee580b0c7b6116b4a7b558b5bda965",
  "bib_md5": "0545ef29119d63866360fb950ce29c11",
  "llncs_md5": "543b73320c367b0229b3cdfcddaedc46",
  "bst_md5": "aadf770ded437d161532035219ea6f45",
@@ -116,9 +116,9 @@
  ],
  "doi": null,
  "outputs": {
-  "supplementary_LNBI.tex": "cc01e19294e5e457e668dc2b35fc9ce5",
+  "supplementary_LNBI.tex": "62c3019b76e601c6ac81035ba0b2d82d",
   "supplementary_LNBI.bbl": "9b8b9bf9e3f4f3ad8b9c92d14a585b0e",
-  "supplementary_LNBI.pdf": "ce22e9d7631beab52222defc7df87768",
+  "supplementary_LNBI.pdf": "c16b5052ae522e26e4173fbb5444dd4f",
   "cibb2026_references.bib": "0545ef29119d63866360fb950ce29c11",
   "figures/figS1.pdf": "86f64ec2798f5de98e71d26db6aeed74",
   "figures/figS2.pdf": "4b1bb326742675d14074fbc7f3af9b44",

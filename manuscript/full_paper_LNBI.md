@@ -298,7 +298,7 @@ Co-occurrence in rapids-singlecell 0.14.1 was incorrect at Visium HD 8 um and is
 
 # Availability of Data and Software Code
 
-All code, Dockerfiles, SLURM submission scripts, benchmark result JSON files and the scripts that generate every figure are available at <https://github.com/lucavd/2026.scRNA_DGX>. The Supplementary Material (extended methods, results and discussion, Supplementary Tables S1-S8 and Figures S1-S3) is archived with the code.
+All code, Dockerfiles, SLURM submission scripts, benchmark result JSON files and the scripts that generate every figure are available at <https://github.com/lucavd/scRNA-DGX-benchmark> (release v1.0.0) and archived on Zenodo (<https://doi.org/10.5281/zenodo.23984290>). The Supplementary Material (extended methods, results and discussion, Supplementary Tables S1-S8 and Figures S1-S3) is included in the archive.
 
 # Acknowledgements
 

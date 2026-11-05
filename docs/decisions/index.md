@@ -36,3 +36,7 @@
 
 * [Sorgente LaTeX generato da script, figure copiate con il loro numero (D-23)](D-23.md) - Il .tex del capitolo e del supplemento si genera dal .md con tools/s7_md2lncs.py; le figure entrano come copie figN.pdf, mentre i file prodotti dagli script restano con il loro nome.
 * [Correzioni del repository prima della release (D-24)](D-24.md) - Script di download spatial, script SLURM a 8 GPU, risultati principali del README, LEGENDS.md e vecchie copie delle figure del LaTeX allineati a ciò che è girato e al capitolo.
+
+# Decisioni del PI (5 novembre 2026)
+
+* [Repository pubblica pulita scRNA-DGX-benchmark con DOI Zenodo (D-25)](D-25.md) - Il codice, i risultati e il supplemento si pubblicano in una repository GitHub nuova e pulita, archiviata su Zenodo con DOI riservato; il repository di lavoro resta pubblico senza i PDF degli articoli citati.
