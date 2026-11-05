@@ -2,6 +2,8 @@
 
 ## 2026-11-05
 
+- [LaTeX, METEOR e verifica finale (S7)](steps/S7.md), dopo la chiusura: `(\Envelope)` accanto all'autore corrispondente nel `.tex` del capitolo, su richiesta del PI; capitolo e pacchetto METEOR rigenerati e ricontrollati.
+
 - [LaTeX, METEOR e verifica finale (S7)](steps/S7.md) chiuso: il PI approva pubblicazione dell'archivio, ringraziamenti e PDF finale; deposito Zenodo pubblicato con DOI 10.5281/zenodo.23984290 (approvazione nel file dello step).
 
 - [LaTeX, METEOR e verifica finale (S7)](steps/S7.md), seguito: scelte del PI in [ORCID, strumento di LLM nei ringraziamenti e supplemento anche su METEOR (D-26)](decisions/D-26.md); ORCID di Luca Vedovelli nell'intestazione, «Claude Opus 5.5, Anthropic» nei ringraziamenti (`tools/s7_ack_orcid.py`); LaTeX, controlli e pacchetto rifatti (14 e 24 pagine); release e archivio Zenodo aggiornati.
