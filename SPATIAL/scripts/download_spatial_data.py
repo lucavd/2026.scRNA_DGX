@@ -325,7 +325,7 @@ def verify_visium(data_dir: Path) -> None:
             images = adata.uns["spatial"][lib_id].get("images", {})
             print(f"    Images: {list(images.keys())}")
     except Exception as e:
-        print(f"  Visium: ERROR — {e}")
+        print(f"  Visium: ERROR: {e}")
 
 
 def verify_visium_hd(data_dir: Path) -> None:
