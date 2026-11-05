@@ -1,6 +1,8 @@
 ---
 title: "Supplementary Material. GPU-accelerated single-cell (NVIDIA DGX H100) and spatial (RTX 4090) transcriptomics: per-step speedups, capacity and concordance against a 100-CPU reference"
 bibliography: bibliography/cibb2026_references.bib
+orcid:
+  Luca Vedovelli: 0000-0003-4847-2333
 ---
 
 Luca Vedovelli^1,2^, Corrado Lanera^1,2^, Daniele Sabbatini^1,2,3^, and Dario Gregori^1,2^

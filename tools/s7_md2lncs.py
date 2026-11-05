@@ -12,6 +12,7 @@ Converts manuscript/full_paper_LNBI.md (chapter) or manuscript/supplementary_LNB
     acknowledgements, as in Springer's instructions;
   - "**Figure N.**" / "**Table N.**" removed from the start of captions (llncs
     prints "Fig. N." / "Table N." itself) and replaced by \\label{fig:N} / \\label{tab:N};
+  - ORCID identifiers from the YAML field `orcid:` of the .md, as \\orcidID after the author;
   - figure files copied to <out>/figures/ under the number of their caption
     (fig1.pdf ... or figS1.pdf ...), md5 recorded (ledger R0735, decision D-23);
   - tables set in \\footnotesize with 2 pt column separation, \\emergencystretch 1em; long e-mail
@@ -133,12 +134,14 @@ def build(src, out, build_dir, supplement, doi, tag):
     btex = fix_cites(pandoc(body_main))
     btex, caporder = captions(btex)
     btex = tables(symbols(breakable(btex)))
+    orcid = dict(re.findall(r"(?m)^  ([^:\n]+):\s*(\d{4}-\d{4}-\d{4}-\d{3}[\dX])\s*$",
+                            (re.search(r"(?ms)^orcid:\s*\n((?:  .*\n)+)", md.split("\n---\n", 1)[0] + "\n") or re.match("", "")).group(1) or ""))
     alist = [a.strip() for a in re.split(r",\s+(?:and\s+)?(?=[A-Z])|\s+and\s+(?=[A-Z])", authors) if a.strip()]
     atex = []
     for a in alist:
         nm = re.sub(r"\^([0-9,]+)\^", "", a).strip()
         sup = re.search(r"\^([0-9,]+)\^", a)
-        atex.append(nm + (r"\inst{%s}" % sup.group(1) if sup else ""))
+        atex.append(nm + (r"\inst{%s}" % sup.group(1) if sup else "") + (r"\orcidID{%s}" % orcid[nm] if nm in orcid else ""))
     itex = []
     for p in insts:
         t = re.sub(r"^\^[0-9]+\^\s*", "", p)

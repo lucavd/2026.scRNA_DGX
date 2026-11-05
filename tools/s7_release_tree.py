@@ -100,8 +100,11 @@ def citation_cff(doi):
            "title: \"scRNA-DGX-benchmark: code, results and Supplementary Material of a GPU versus CPU benchmark of single-cell and spatial transcriptomics\"",
            "version: 1.0.0", "doi: %s" % doi, "license: MIT", "repository-code: \"https://github.com/lucavd/scRNA-DGX-benchmark\"",
            "type: software", "authors:"]
+    orcid = {"Vedovelli": "0000-0003-4847-2333"}  # checked on pub.orcid.org, 2026-11-05
     for fam, giv in authors:
         out += ["  - family-names: \"%s\"" % fam, "    given-names: \"%s\"" % giv, "    affiliation: \"%s\"" % aff]
+        if fam in orcid:
+            out.append("    orcid: \"https://orcid.org/%s\"" % orcid[fam])
     out += ["keywords:", "  - GPU computing", "  - single-cell RNA-seq", "  - spatial transcriptomics", "  - benchmarking", "  - rapids-singlecell"]
     return "\n".join(out) + "\n"
 

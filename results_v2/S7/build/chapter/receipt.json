@@ -1,8 +1,8 @@
 {
  "tag": "chapter",
- "at": "2026-11-05T17:11:29+01:00",
+ "at": "2026-11-05T17:29:09+01:00",
  "src": "manuscript/full_paper_LNBI.md",
- "src_md5": "44cda299743155db10b92a1a4cc0cc3d",
+ "src_md5": "6e8437eceac8c5ade5a4569766c78398",
  "bib_md5": "0545ef29119d63866360fb950ce29c11",
  "llncs_md5": "543b73320c367b0229b3cdfcddaedc46",
  "bst_md5": "aadf770ded437d161532035219ea6f45",
@@ -97,9 +97,9 @@
  ],
  "doi": null,
  "outputs": {
-  "full_paper_LNBI.tex": "24f0decf11150ce6acd9eb0a7180c1b1",
+  "full_paper_LNBI.tex": "b69f2cb0fddb40487d93d760d776cf02",
   "full_paper_LNBI.bbl": "509a649fb12277b87c917facd0bc6ed0",
-  "full_paper_LNBI.pdf": "b5ead2779e0f1a1081268cae056b3b68",
+  "full_paper_LNBI.pdf": "6d0d30201c4c8968a6ebab59f07dd58e",
   "cibb2026_references.bib": "0545ef29119d63866360fb950ce29c11",
   "figures/fig1.pdf": "43c2e665d3a0addbc440588f822ff963",
   "figures/fig2.pdf": "fde366b542fbec8703d05a1faa59f0b7",

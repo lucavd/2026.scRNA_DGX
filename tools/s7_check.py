@@ -67,7 +67,7 @@ def tex_plain(tex):
     body = re.sub(r"(?s)\\begin\{longtable\}\[\]\{@\{\}.*?@\{\}\}", " ", body)  # column specification
     body = re.sub(r"\\setlength\{[^}]*\}\{[^}]*\}", " ", body)
     body = re.sub(r"\\textasciitilde(?:\{\})?", "~", body)
-    for cmd in ("inst", "label", "ref", "url", "nolinkurl", "texttt", "email", "includegraphics", "typeout"):
+    for cmd in ("orcidID", "inst", "label", "ref", "url", "nolinkurl", "texttt", "email", "includegraphics", "typeout"):
         body = re.sub(r"\\%s(?:\[[^\]]*\])?\{(?:[^{}]|\{[^{}]*\})*\}" % cmd, " ", body)
     body = body.replace("\\allowbreak{}", "")
     body = re.sub(r"\\(?:%|&|_|#)", lambda m: m.group(0)[1], body)

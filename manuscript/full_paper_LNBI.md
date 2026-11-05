@@ -1,6 +1,8 @@
 ---
 title: "GPU-accelerated single-cell (NVIDIA DGX H100) and spatial (RTX 4090) transcriptomics: per-step speedups, capacity and concordance against a 100-CPU reference"
 bibliography: bibliography/cibb2026_references.bib
+orcid:
+  Luca Vedovelli: 0000-0003-4847-2333
 ---
 
 Luca Vedovelli^1,2^, Corrado Lanera^1,2^, Daniele Sabbatini^1,2,3^, and Dario Gregori^1,2^
@@ -303,7 +305,7 @@ All code, Dockerfiles, SLURM submission scripts, benchmark result JSON files and
 # Acknowledgements
 
 The computational resources for the scRNA-seq benchmarks and for the CPU reference of the spatial benchmarks were provided by the
-UPSCALE/CONVECS DGX H100 cluster at the University of Padova. This work was supported in part by the high-performance computing infrastructure developed under the project "CONVECS", funded by the PR Veneto FESR 2021-2027 program, Priority 1 - Specific Objective 1.1 - Action 1.1.2. The authors used a large language model-based assistant to check the analysis code against the text, to recompute reported values from the result files with scripts and to draft revisions of the text; the authors reviewed every change and take full responsibility for the content of this chapter.
+UPSCALE/CONVECS DGX H100 cluster at the University of Padova. This work was supported in part by the high-performance computing infrastructure developed under the project "CONVECS", funded by the PR Veneto FESR 2021-2027 program, Priority 1 - Specific Objective 1.1 - Action 1.1.2. The authors used a large language model-based assistant (Claude Opus 5.5, Anthropic) to check the analysis code against the text, to recompute reported values from the result files with scripts and to draft revisions of the text; the authors reviewed every change and take full responsibility for the content of this chapter.
 
 # Funding
 

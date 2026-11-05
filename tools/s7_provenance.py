@@ -71,7 +71,7 @@ STRUCT = [
     ("version", None),
     ("identifier or grant code", re.compile(r"(?:CUP|code|PNC|D\.D\.|job|jobs|node|poddgx|SID|BIRD|seed|seeds|seed =)\s*:?\s*$", re.I)),
 ]
-VERSION_CTX = re.compile(r"(?:Scanpy|scanpy|Squidpy|rapids-singlecell|RAPIDS|CuPy|RMM|cuGraph|cuML|Dask|Dask-CUDA|Python|Space Ranger|Seurat|driver|CUDA|version|v|anndata|AnnData|pynndescent|igraph|leidenalg|numba|Numba|NumPy|SciPy|Singularity|Docker|NVLink|PCIe|DDR|NVIDIA|Platinum|Threadripper PRO|RTX|H100|A100|B200|B300|V100|DGX|release|Census|CELLxGENE|PR Veneto FESR|Priority|Objective|Action|PNC-I\.|CIBB)\s*$")
+VERSION_CTX = re.compile(r"(?:Scanpy|scanpy|Squidpy|rapids-singlecell|RAPIDS|CuPy|RMM|cuGraph|cuML|Dask|Dask-CUDA|Python|Space Ranger|Seurat|driver|CUDA|version|v|anndata|AnnData|pynndescent|igraph|leidenalg|numba|Numba|NumPy|SciPy|Singularity|Docker|NVLink|PCIe|DDR|NVIDIA|Platinum|Threadripper PRO|RTX|H100|A100|B200|B300|V100|DGX|release|Census|CELLxGENE|PR Veneto FESR|Priority|Objective|Action|PNC-I\.|CIBB|Claude Opus)\s*$")
 
 
 def structural(t, ln, pos):

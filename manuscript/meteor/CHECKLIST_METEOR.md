@@ -23,11 +23,11 @@ Stato: **fatto** = pronto nel repository; **PI** = azione del PI, che fa la sott
 | Titolo e abstract diversi da quelli dello short paper | fatto | approvati nello step S3; abstract di 247 parole (limite LNCS 150-250) |
 | Stessa lista e ordine degli autori dello short paper | fatto | Vedovelli, Lanera, Sabbatini, Gregori, come in `manuscript/manuscript_short_cameraready.md` |
 | Autore corrispondente | PI | nello short paper è Luca Vedovelli; in METEOR si indica nel sistema |
-| ORCID degli autori (`\orcidID`, raccomandato da Springer) | PI, facoltativo | da fornire se si vogliono nel capitolo; non scritti a memoria |
+| ORCID degli autori (`\orcidID`, raccomandato da Springer) | fatto | Luca Vedovelli `0000-0003-4847-2333`, controllato su `pub.orcid.org`; gli altri autori senza ORCID |
 | Almeno un aspetto esteso rispetto allo short paper | fatto | nuovo riferimento CPU spatial (step S1) |
 | Almeno 8 pagine, formato LNCS | fatto | 14 pagine, riferimenti da pagina 12 |
 | Acknowledgements e Disclosure of Interests nell'ambiente `credits` | fatto | Funding come secondo paragrafo dei ringraziamenti |
 | Ringraziamento CONVECS per i run su UPSCALE | PI | formula da `https://convecs.it/projects-and-ack/` letta il 4 novembre 2026; da confermare con `hpc@unipd.it` |
-| Strumento di LLM nominato nei ringraziamenti | PI, facoltativo | oggi la frase non lo nomina |
+| Strumento di LLM nominato nei ringraziamenti | fatto | «Claude Opus 5.5, Anthropic» |
 | Release del repository con DOI Zenodo, citata in Availability | fatto, pubblicazione PI | `https://github.com/lucavd/scRNA-DGX-benchmark` (tag `v1.0.0`), DOI riservato `10.5281/zenodo.23984290`, già scritto nel capitolo e nel supplemento; l'archivio è caricato nella bozza Zenodo 23984290 e va pubblicato prima della sottomissione (non si annulla) |
-| Supplemento non caricato su SpringerLink | fatto | scelta del PI (decisione D-21): solo nella release Zenodo |
+| Supplemento come materiale supplementare su METEOR | PI | caricare `manuscript/meteor/zenodo/supplementary_LNBI.pdf` (24 pagine), lo stesso file dell'archivio Zenodo; Springer chiede l'approvazione preventiva dei PC Chairs per il materiale supplementare (scelta del PI del 5 novembre 2026) |

@@ -40,3 +40,4 @@
 # Decisioni del PI (5 novembre 2026)
 
 * [Repository pubblica pulita scRNA-DGX-benchmark con DOI Zenodo (D-25)](D-25.md) - Il codice, i risultati e il supplemento si pubblicano in una repository GitHub nuova e pulita, archiviata su Zenodo con DOI riservato; il repository di lavoro resta pubblico senza i PDF degli articoli citati.
+* [ORCID, strumento di LLM nei ringraziamenti e supplemento anche su METEOR (D-26)](D-26.md) - ORCID del primo autore nell'intestazione, nome dello strumento di LLM nei ringraziamenti, supplemento caricato dal PI anche su METEOR oltre che nell'archivio Zenodo.
