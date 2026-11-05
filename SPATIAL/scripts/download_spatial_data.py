@@ -3,7 +3,7 @@
 
 Downloads two 10x Genomics datasets:
 1. Visium Mouse Brain Sagittal Anterior (~3,000 spots, 55 µm resolution)
-2. Visium HD Mouse Brain FFPE (~300k-500k bins at 8 µm resolution)
+2. Visium HD Mouse Brain FFPE, Space Ranger 3.0.0 (393,543 bins at 8 µm, 6,296,688 at 2 µm)
 
 Both datasets are mouse brain tissue, matching the scRNA-seq benchmark.
 
@@ -40,16 +40,29 @@ VISIUM_FILES = {
     ),
 }
 
-# ── Visium HD Mouse Brain (Space Ranger 4.0.1) ──────────────────────────────
-# 10x Genomics developer "Tiny" dataset — complete Space Ranger output with
-# binned_outputs/square_002um/. Native resolution is 2 µm; we can aggregate
-# to 8 µm or 16 µm in the benchmark scripts if needed.
-VISIUM_HD_URL = (
-    "https://cf.10xgenomics.com/samples/spatial-exp/4.0.1"
-    "/Visium_HD_Tiny_3prime_Dataset"
-    "/Visium_HD_Tiny_3prime_Dataset_outs.zip"
+# ── Visium HD Mouse Brain FFPE (Space Ranger 3.0.0) ─────────────────────────
+# The dataset analysed in the chapter. Until 2026-11-05 this script pointed to
+# the 10x developer "Visium_HD_Tiny_3prime_Dataset" (Space Ranger 4.0.1), which
+# is NOT the dataset of the benchmark. The four .h5 matrices of
+# Visium_HD_Mouse_Brain_binned_outputs.tar.gz were checked byte for byte
+# (md5) against the files analysed in SPATIAL/data/visium_hd/ on 2026-11-05
+# (step S7 of the LNBI chapter); their md5 are below and are verified after
+# extraction.
+VISIUM_HD_SAMPLE = "Visium_HD_Mouse_Brain"
+VISIUM_HD_BASE_URL = (
+    "https://cf.10xgenomics.com/samples/spatial-exp/3.0.0"
+    f"/{VISIUM_HD_SAMPLE}"
 )
-VISIUM_HD_ARCHIVE = "Visium_HD_Tiny_3prime_Dataset_outs.zip"
+VISIUM_HD_ARCHIVES = [
+    f"{VISIUM_HD_SAMPLE}_binned_outputs.tar.gz",  # 4,616,239,264 bytes
+    f"{VISIUM_HD_SAMPLE}_spatial.tar.gz",         # 70,978,529 bytes
+]
+VISIUM_HD_MD5 = {
+    "binned_outputs/square_002um/filtered_feature_bc_matrix.h5": "f3095a576f21495dedb349377d4f032d",
+    "binned_outputs/square_002um/raw_feature_bc_matrix.h5": "6591190e7de059c0352e876c966fb6e8",
+    "binned_outputs/square_008um/filtered_feature_bc_matrix.h5": "70aa0e8613fad7819ab737e298dd5c69",
+    "binned_outputs/square_008um/raw_feature_bc_matrix.h5": "1f6150257581b7c99763f689c0364656",
+}
 
 
 def download_file(url: str, dest: Path, description: str = "") -> bool:
@@ -200,59 +213,64 @@ def download_visium(data_dir: Path) -> bool:
 
 
 def download_visium_hd(data_dir: Path) -> bool:
-    """Download Visium HD Mouse Brain dataset (Tiny 3' dataset, SR 4.0.1).
+    """Download Visium HD Mouse Brain FFPE (Space Ranger 3.0.0), the chapter dataset.
 
-    Downloads the 10x developer "Tiny" Visium HD dataset as a zip archive,
-    extracts it, and flattens the directory structure so that
-    data_dir/visium_hd/binned_outputs/square_002um/ exists.
-
-    Native resolution is 2 µm. Aggregation to 8/16 µm can be done in the
-    benchmark scripts if needed.
+    Downloads the binned outputs (2, 8 and 16 um) and the spatial folder as
+    tar.gz archives, extracts them into data_dir/visium_hd/ and checks the md5
+    of the four matrices against VISIUM_HD_MD5.
 
     Args:
         data_dir: Base data directory.
 
     Returns:
-        True if download succeeded.
+        True if download, extraction and md5 check succeeded.
     """
     visium_hd_dir = data_dir / "visium_hd"
     visium_hd_dir.mkdir(parents=True, exist_ok=True)
 
-    # Check if already complete
     binned_dir = visium_hd_dir / "binned_outputs"
     if binned_dir.exists() and any(binned_dir.iterdir()):
-        print(f"  Visium HD data already complete at {visium_hd_dir}")
-        return True
+        print(f"  Visium HD data already present at {visium_hd_dir}")
+        return check_visium_hd_md5(visium_hd_dir)
 
     print(f"\n{'─' * 60}")
-    print(f"Downloading Visium HD Mouse Brain (Tiny 3', Space Ranger 4.0.1)")
+    print("Downloading Visium HD Mouse Brain FFPE (Space Ranger 3.0.0)")
     print(f"{'─' * 60}")
 
-    archive_dest = visium_hd_dir / VISIUM_HD_ARCHIVE
-    if not download_file(VISIUM_HD_URL, archive_dest, "Visium HD Tiny 3' dataset"):
-        return False
-
-    # Extract zip archive
-    if not extract_zip(archive_dest, visium_hd_dir):
-        return False
-
-    # Flatten: zip may contain a top-level "outs/" or dataset-name directory
-    _flatten_extracted_dir(visium_hd_dir)
-
-    # Clean up archive
-    if archive_dest.exists():
+    for name in VISIUM_HD_ARCHIVES:
+        archive_dest = visium_hd_dir / name
+        if not download_file(f"{VISIUM_HD_BASE_URL}/{name}", archive_dest, name):
+            return False
+        print(f"  Extracting {name} ...")
+        with tarfile.open(archive_dest, "r:gz") as tf:
+            tf.extractall(visium_hd_dir)
+        _flatten_extracted_dir(visium_hd_dir)
         archive_dest.unlink()
-        print(f"  Cleaned up: {archive_dest.name}")
+        print(f"  Cleaned up: {name}")
 
-    # Verify
-    if binned_dir.exists():
-        return True
+    if not binned_dir.exists():
+        print("\n  ERROR: binned_outputs/ not found after extraction.")
+        return False
+    return check_visium_hd_md5(visium_hd_dir)
 
-    print(f"\n  ERROR: binned_outputs/ not found after extraction.")
-    print(f"  Contents of {visium_hd_dir}:")
-    for item in sorted(visium_hd_dir.iterdir()):
-        print(f"    {item.name}/")
-    return False
+
+def check_visium_hd_md5(visium_hd_dir: Path) -> bool:
+    """Compare the md5 of the four Visium HD matrices with those of the chapter."""
+    ok = True
+    for rel, expected in VISIUM_HD_MD5.items():
+        p = visium_hd_dir / rel
+        if not p.exists():
+            print(f"  MISSING {rel}")
+            ok = False
+            continue
+        h = hashlib.md5()
+        with open(p, "rb") as fh:
+            for chunk in iter(lambda: fh.read(1 << 24), b""):
+                h.update(chunk)
+        same = h.hexdigest() == expected
+        ok = ok and same
+        print(f"  {'OK ' if same else 'DIFF'} {rel}")
+    return ok
 
 
 def _flatten_extracted_dir(target_dir: Path) -> None:
@@ -345,6 +363,8 @@ def verify_visium_hd(data_dir: Path) -> None:
                 print(f"    {bin_size}: MEX format found")
             else:
                 print(f"    {bin_size}: no count matrix found")
+    print("    md5 of the matrices against the chapter dataset:")
+    check_visium_hd_md5(visium_hd_dir)
 
 
 def parse_args() -> argparse.Namespace:

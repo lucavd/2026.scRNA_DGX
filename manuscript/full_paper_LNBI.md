@@ -127,27 +127,27 @@ Multi-GPU scaling was therefore not measured.
 : **Table 1.** scRNA-seq benchmark: total time, mean and SD over five repeats (first repeat included), and peak memory. Single-GPU results at 500k and 1.3M cells are absent because the single-GPU pipeline failed during QC.
 
 | Pipeline | Cells | GPUs | Total time (s) | SD (s) | Peak RAM (GiB) | Peak VRAM (GiB) |
-|:---------|------:|-----:|---------------:|-------:|---------------:|---------------:|
-| CPU (Scanpy) | 10k | 0 | 39.5 | 10.2 | 1.2 | --- |
+|:---------------|-----:|-----:|------------:|-------:|-----------:|------------:|
+| CPU (Scanpy) | 10k | 0 | 39.5 | 10.2 | 1.2 | n.a. |
 | GPU (rapids) | 10k | 1 | 3.3 | 1.7 | 2.4 | 40.7 |
 | GPU | 10k | 2 | 4.9 | 2.6 | 2.3 | 52.4 |
 | GPU | 10k | 4 | 4.9 | 2.6 | 2.3 | 65.0 |
 | GPU | 10k | 8 | 4.9 | 2.3 | 2.3 | 106.5 |
-| CPU (Scanpy) | 50k | 0 | 282.5 | 9.1 | 3.6 | --- |
+| CPU (Scanpy) | 50k | 0 | 282.5 | 9.1 | 3.6 | n.a. |
 | GPU (rapids) | 50k | 1 | 8.4 | 2.2 | 5.4 | 40.7 |
 | GPU | 50k | 2 | 14.7 | 2.4 | 3.5 | 52.4 |
 | GPU | 50k | 4 | 14.6 | 2.6 | 3.5 | 65.0 |
 | GPU | 50k | 8 | 15.1 | 2.2 | 3.4 | 106.5 |
-| CPU (Scanpy) | 100k | 0 | 646.7 | 10.5 | 6.7 | --- |
+| CPU (Scanpy) | 100k | 0 | 646.7 | 10.5 | 6.7 | n.a. |
 | GPU (rapids) | 100k | 1 | 14.8 | 2.2 | 8.8 | 40.7 |
 | GPU | 100k | 2 | 26.9 | 2.4 | 4.9 | 52.4 |
 | GPU | 100k | 4 | 26.9 | 2.3 | 4.9 | 65.1 |
 | GPU | 100k | 8 | 26.4 | 2.6 | 4.9 | 106.6 |
-| CPU (Scanpy) | 500k | 0 | 4,346.7 | 40.3 | 29.7 | --- |
+| CPU (Scanpy) | 500k | 0 | 4,346.7 | 40.3 | 29.7 | n.a. |
 | GPU | 500k | 2 | 124.5 | 2.9 | 15.6 | 52.7 |
 | GPU | 500k | 4 | 125.0 | 6.0 | 15.9 | 65.5 |
 | GPU | 500k | 8 | 124.6 | 3.7 | 15.5 | 107.0 |
-| CPU (Scanpy) | 1.3M | 0 | 52,056.2 | 392.0 | 107.4 | --- |
+| CPU (Scanpy) | 1.3M | 0 | 52,056.2 | 392.0 | 107.4 | n.a. |
 | GPU | 1.3M | 2 | 493.3 | 10.3 | 60.7 | 74.9 |
 | GPU | 1.3M | 4 | 486.6 | 20.2 | 60.7 | 92.7 |
 | GPU | 1.3M | 8 | 435.2 | 16.2 | 52.3 | 134.2 |
@@ -207,7 +207,7 @@ The choice of CPU changed the speedup by 10-14%, in different directions per pla
 : **Table 2.** Spatial benchmark: mean +/- SD of five repeats, each in a fresh process. CPU: one DGX H100 node (`poddgx02`, 100 CPUs), the reference; GPU: one RTX 4090. Speedup: ratio of mean totals with 95% bootstrap interval; the next column uses the 128-thread workstation CPU as reference. At Visium HD 8 um the totals include co-occurrence, whose GPU result with rapids-singlecell 0.14.1 was incorrect; without it the totals are 616 s (CPU) and 89.7 s (GPU) and the speedup is 6.9x (6.8-6.9) (6.1x with the workstation CPU). Memory: mean of the per-repeat peaks (GiB); GPU VRAM includes the RMM pool.
 
 | Platform | Spots/bins | CPU total (s) | GPU total (s) | Speedup | Speedup, workstation CPU | CPU RAM (GiB) | GPU VRAM (GiB) |
-|:---------|----------:|---------------:|--------------:|--------:|--------:|-------------:|--------------:|
+|:-------------------------------------------------|-----------------------------------------:|--------------------------------------------:|-------------------------------------------------:|------------------------------------------------------:|--------------------------------------------:|-----------------------:|-----------------------------:|
 | Visium v1 | 2,695 | 33.9 +/- 1.0 | 24.0 +/- 0.2 | 1.41x (1.38-1.45) | 1.61x | 0.97 | 12.74 |
 | Visium HD 8 um | 393,543 | 719 +/- 3 | 92.2 +/- 0.7 | 7.80x (7.75-7.85) | 6.69x | 6.95 | 22.74 |
 | Visium HD 2 um (random 400k-bin subsample) | 389,492 | 1,146 +/- 50 | 109.9 +/- 0.8 | 10.43x (10.15-10.82) | 9.39x | 7.95 | 22.73 |
@@ -296,9 +296,9 @@ CPU and GPU outputs agreed closely at 10,000 cells; agreement at atlas scale rem
 On one RTX 4090, spatial autocorrelation agreed with the CPU and was accelerated.
 Co-occurrence in rapids-singlecell 0.14.1 was incorrect at Visium HD 8 um and is corrected in 0.15.1.
 
-# Conflict of Interest
+# Availability of Data and Software Code
 
-The authors declare no conflict of interest.
+All code, Dockerfiles, SLURM submission scripts, benchmark result JSON files and the scripts that generate every figure are available at <https://github.com/lucavd/2026.scRNA_DGX>. The Supplementary Material (extended methods, results and discussion, Supplementary Tables S1-S8 and Figures S1-S3) is archived with the code.
 
 # Acknowledgements
 
@@ -309,8 +309,8 @@ UPSCALE/CONVECS DGX H100 cluster at the University of Padova. This work was supp
 
 This study was co-funded by the BIRD 2024/START (SID) programs, Department of Cardio-Thoracic-Vascular Sciences (DCTV), University of Padova (PI: Daniele Sabbatini; 2024DCTV1SIDPROGETTI-00183) and by the Italian Complementary National Plan PNC-I.1 "Research initiatives for innovative technologies and pathways in the health and welfare sector" D.D. 931 of 06/06/2022, "DARE-DigitAl lifelong pRevEntion" initiative, code PNC0000002, CUP: B53C22006440001.
 
-# Availability of Data and Software Code
+# Disclosure of Interests
 
-All code, Dockerfiles, SLURM submission scripts, benchmark result JSON files and the scripts that generate every figure are available at <https://github.com/lucavd/2026.scRNA_DGX>. The Supplementary Material (extended methods, results and discussion, Supplementary Tables S1-S8 and Figures S1-S3) is archived with the code.
+The authors have no competing interests to declare that are relevant to the content of this article.
 
 # References

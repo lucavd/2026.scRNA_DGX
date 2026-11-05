@@ -73,10 +73,10 @@
 % [A] Software citation for the RAPIDS suite (cuDF, cuGraph, Dask-CUDA); no standalone peer-reviewed paper exists.
 @misc{RAPIDS2024,
   author    = {{RAPIDS Development Team}},
-  title     = {{RAPIDS}: Open {GPU} Data Science},
-  year      = {2024},
+  title     = {{RAPIDS}: Libraries for End to End {GPU} Data Science},
+  year      = {2026},
   url       = {https://rapids.ai},
-  note      = {Software available at \url{https://github.com/rapidsai}}
+  note      = {Version 26.02. Software available at \url{https://github.com/rapidsai}, last accessed 3 November 2026}
 }
 
 % =============================================================================
@@ -110,6 +110,8 @@
   booktitle = {Proceedings of the SC '25 Workshops of the International Conference for High Performance Computing, Networking, Storage and Analysis},
   year      = {2025},
   publisher = {ACM},
+  address   = {St. Louis, MO, USA},
+  pages     = {349--358},
   doi       = {10.1145/3731599.3767378}
 }
 
@@ -141,11 +143,24 @@
 }
 
 % [C] Floating-point non-associativity in HPC reproducibility, directly relevant to GPU vs CPU numerical differences.
+@article{CZCellxGene2025,
+  author    = {{CZI Cell Science Program} and Abdulla, Shibla and Aevermann, Brian and Assis, Pedro and Badajoz, Seve and Bell, Sidney M and Bezzi, Emanuele and Cakir, Batuhan and Chaffer, Jim and Chambers, Signe and Cherry, J Michael and Chi, Tiffany and Chien, Jennifer and Dorman, Leah and Garcia-Nieto, Pablo and Gloria, Nayib and Hastie, Mim and Hegeman, Daniel and Hilton, Jason and Huang, Timmy and Infeld, Amanda and Istrate, Ana-Maria and Jelic, Ivana and Katsuya, Kuni and Kim, Yang Joon and Liang, Karen and Lin, Mike and Lombardo, Maximilian and Marshall, Bailey and Martin, Bruce and McDade, Fran and Megill, Colin and Patel, Nikhil and Predeus, Alexander and Raymor, Brian and Robatmili, Behnam and Rogers, Dave and Rutherford, Erica and Sadgat, Dana and Shin, Andrew and Small, Corinn and Smith, Trent and Sridharan, Prathap and Tarashansky, Alexander and Tavares, Norbert and Thomas, Harley and Tolopko, Andrew and Urisko, Meghan and Yan, Joyce and Yeretssian, Garabet and Zamanian, Jennifer and Mani, Arathi and Cool, Jonah and Carr, Ambrose},
+  title     = {{CZ CELLxGENE Discover}: a single-cell data platform for scalable exploration, analysis and modeling of aggregated data},
+  journal   = {Nucleic Acids Research},
+  year      = {2025},
+  volume    = {53},
+  number    = {D1},
+  pages     = {D886--D900},
+  doi       = {10.1093/nar/gkae1142}
+}
+
 @inproceedings{Shanmugavelu2024,
   author    = {Shanmugavelu, Sanjif and Taillefumier, Mathieu and Culver, Christopher and Hernandez, Oscar and Coletti, Mark and Sedova, Ada},
   title     = {Impacts of floating-point non-associativity on reproducibility for {HPC} and deep learning applications},
-  booktitle = {Proceedings of the SC '24 Workshops of the International Conference on High Performance Computing, Networking, Storage, and Analysis (CORRECTNESS 2024)},
+  booktitle = {SC24-W: Workshops of the International Conference for High Performance Computing, Networking, Storage and Analysis},
   year      = {2024},
+  pages     = {170--179},
+  publisher = {IEEE},
   doi       = {10.1109/SCW63240.2024.00028}
 }
 
@@ -353,22 +368,24 @@
 
 % [G] Primary citation for Squidpy, the CPU-based spatial omics framework used as baseline in the spatial benchmark.
 @article{Palla2022,
-  author    = {Palla, Giovanni and Spitzer, Hannah and Klein, Michal and Fischer, David and Schaar, Anna Christina and Kuemmerle, Louis Benedikt and Rybakov, Sergei and Ibarra, Ignacio L. and Holber, Olle and Virshup, Isaac and Pegno, Mohammad Nofallah and Theis, Fabian J.},
+  author    = {Palla, Giovanni and Spitzer, Hannah and Klein, Michal and Fischer, David S. and Schaar, Anna Christina and Kuemmerle, Louis Benedikt and Rybakov, Sergei and Ibarra, Ignacio L. and Holmberg, Olle and Virshup, Isaac and Lotfollahi, Mohammad and Richter, Sabrina and Theis, Fabian J.},
   title     = {{Squidpy}: a scalable framework for spatial omics analysis},
   journal   = {Nature Methods},
   year      = {2022},
   volume    = {19},
+  number    = {2},
   pages     = {171--178},
   doi       = {10.1038/s41592-021-01358-2}
 }
 
 % [G] Citation for the SpatialData framework used for spatial data format and IO.
 @article{Marconato2024,
-  author    = {Marconato, Luca and Palla, Giovanni and Yaber, Kevin A. and Chierici, Andrea and Puente-Lelievre, Corentin and Nabavi, Sheila and Rattray, Magnus and Stegle, Oliver and Theis, Fabian J.},
+  author    = {Marconato, Luca and Palla, Giovanni and Yamauchi, Kevin A. and Virshup, Isaac and Heidari, Elyas and Treis, Tim and Vierdag, Wouter-Michiel and Toth, Marcella and Stockhaus, Sonja and Shrestha, Rahul B. and Rombaut, Benjamin and Pollaris, Lotte and Lehner, Laurens and V{\"o}hringer, Harald and Kats, Ilia and Saeys, Yvan and Saka, Sinem K. and Huber, Wolfgang and Gerstung, Moritz and Moore, Josh and Theis, Fabian J. and Stegle, Oliver},
   title     = {{SpatialData}: an open and universal data framework for spatial omics},
   journal   = {Nature Methods},
-  year      = {2024},
+  year      = {2025},
   volume    = {22},
+  number    = {1},
   pages     = {58--62},
   doi       = {10.1038/s41592-024-02212-x}
 }
@@ -381,4 +398,52 @@
   year      = {1967},
   pages     = {483--485},
   doi       = {10.1145/1465482.1465560}
+}
+
+% [S3] Batch integration method named in the Limitations (R0556).
+@article{Korsunsky2019,
+  author    = {Korsunsky, Ilya and Millard, Nghia and Fan, Jean and Slowikowski, Kamil and Zhang, Fan and Wei, Kevin and Baglaenko, Yuriy and Brenner, Michael and Loh, Po-ru and Raychaudhuri, Soumya},
+  title     = {Fast, sensitive and accurate integration of single-cell data with {Harmony}},
+  journal   = {Nature Methods},
+  year      = {2019},
+  volume    = {16},
+  number    = {12},
+  pages     = {1289--1296},
+  doi       = {10.1038/s41592-019-0619-0}
+}
+
+% [S3] Probabilistic integration method (scVI) named in the Limitations (R0556).
+@article{Lopez2018,
+  author    = {Lopez, Romain and Regier, Jeffrey and Cole, Michael B. and Jordan, Michael I. and Yosef, Nir},
+  title     = {Deep generative modeling for single-cell transcriptomics},
+  journal   = {Nature Methods},
+  year      = {2018},
+  volume    = {15},
+  number    = {12},
+  pages     = {1053--1058},
+  doi       = {10.1038/s41592-018-0229-2}
+}
+
+% [S3] Count-based differential expression model for pseudo-bulk designs (R0608).
+@article{Love2014,
+  author    = {Love, Michael I. and Huber, Wolfgang and Anders, Simon},
+  title     = {Moderated estimation of fold change and dispersion for {RNA-seq} data with {DESeq2}},
+  journal   = {Genome Biology},
+  year      = {2014},
+  volume    = {15},
+  number    = {12},
+  pages     = {550},
+  doi       = {10.1186/s13059-014-0550-8}
+}
+
+% [S3] Count-based differential expression model for pseudo-bulk designs (R0608).
+@article{Robinson2010,
+  author    = {Robinson, Mark D. and McCarthy, Davis J. and Smyth, Gordon K.},
+  title     = {{edgeR}: a {Bioconductor} package for differential expression analysis of digital gene expression data},
+  journal   = {Bioinformatics},
+  year      = {2010},
+  volume    = {26},
+  number    = {1},
+  pages     = {139--140},
+  doi       = {10.1093/bioinformatics/btp616}
 }

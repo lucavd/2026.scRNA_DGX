@@ -36,7 +36,7 @@ The pipeline comprised ten steps (Table S1), timed with `time.perf_counter()`; i
 
 | Step | Operation | Key parameters | Implementation note |
 |-----:|:----------|:---------------|:--------------------|
-| 1 | Data loading | --- | `read_h5ad()` from disk |
+| 1 | Data loading | n.a. | `read_h5ad()` from disk |
 | 2 | QC and filtering | `min_genes` = 200, `min_cells` = 3, mt prefix = `mt-` | Mitochondrial percentage calculated, cells/genes filtered |
 | 3 | Normalisation | `target_sum` = 10,000 | Library-size scaling + `log1p` |
 | 4 | HVG selection | `n_top_genes` = 2,000, Seurat v1 method | On log-normalised data [@Satija2015; @Yip2019] |
@@ -63,7 +63,7 @@ To assess whether the GPU pipeline produces biologically equivalent results, we 
 | Metric | Definition | Scope |
 |:-------|:-----------|:------|
 | HVG Jaccard | size of intersection divided by size of union of the CPU and GPU gene sets for 2,000 HVGs | Feature selection |
-| PCA loading |rho| | Mean absolute Spearman rho across first 10 PC loadings, accounting for sign flips | Dimensionality reduction |
+| PCA loading \|rho\| | Mean absolute Spearman rho across first 10 PC loadings, accounting for sign flips | Dimensionality reduction |
 | kNN Jaccard | Mean per-cell Jaccard overlap of the CPU and GPU neighbour index sets (k = 15) as stored by each pipeline (CPU sets: 16 indices, GPU sets: 15, both including the cell itself); a stability metric also used in [@Gardner2025] | Graph structure |
 | ARI | Adjusted Rand Index of Leiden cluster assignments, adjusted for chance [@Hubert1985] | Clustering |
 | NMI | Normalised Mutual Information of cluster assignments [@Vinh2010] | Clustering |
@@ -181,8 +181,8 @@ Inspired by the chunked-preprocessing strategy of ScaleSC [@Hu2025], we also imp
 | 10.3M | 91 | 465 | 49 | KMeans | Pass |
 | 11.5M | 114 | 517 | 49 | Leiden | Pass |
 | 11.9M | 119 | 535 | 49 | Leiden | **Pass (max)** |
-| 12.0M | --- | --- | --- | Leiden | Fail (Dask shutdown timeout after neighbours) |
-| 13.7M | --- | --- | --- | Leiden, KMeans | Fail (killed after HVG selection) |
+| 12.0M | n.a. | n.a. | n.a. | Leiden | Fail (Dask shutdown timeout after neighbours) |
+| 13.7M | n.a. | n.a. | n.a. | Leiden, KMeans | Fail (killed after HVG selection) |
 
 The three smaller rows were run with cuML KMeans instead of Leiden. Peak CPU RAM was similar for the two clustering methods at about 10M cells (465.4 GiB with KMeans at 10.31M, 460.5 GiB with Leiden at 10.2M), but runtimes were not (91.5 against 69.2 min, with QC taking 3,156 against 2,218 s; the runs were made on different days), so the runtime column combines two series and should not be read as a single curve.
 
@@ -246,7 +246,7 @@ As in the scRNA-seq pipeline, CPU expression neighbour search ran pynndescent on
 : **Table S7.** Per-step wall time and GPU speedup on Visium HD 8 um (393,543 bins): mean +/- SD of five repeats, each in a fresh process; CPU reference: one DGX H100 node (100 CPUs); speedup: ratio of means with 95% bootstrap interval. Spatial neighbours and neighbourhood enrichment have no GPU implementation in rapids-singlecell 0.14.1: the GPU pipeline calls Squidpy on the CPU, so the GPU column for these rows is CPU time on the workstation. PCA includes scaling. CPU expression neighbour search ran on one Numba thread (Methods). Co-occurrence: the GPU result with rapids-singlecell 0.14.1 was incorrect (see text), so no GPU time or speedup is reported (n.r.); with 0.15.1, in a separate check, it took 4.41 s (23.4x). The total includes co-occurrence.
 
 | Step | CPU (s) | GPU (s) | Speedup |
-|:-----|--------:|--------:|--------:|
+|:---------------|--------:|--------:|--------:|
 | Data loading | 3.87 +/- 0.15 | 3.93 +/- 0.08 | 0.99x (0.96-1.02) |
 | QC and filtering | 2.72 +/- 0.09 | 3.07 +/- 0.04 | 0.89x (0.86-0.91) |
 | Normalisation | 2.62 +/- 0.14 | 0.0861 +/- 0.0030 | 30.4x (29.1-32.1) |
@@ -281,7 +281,7 @@ At FDR < 0.05, the Jaccard index of the SVG sets was 1.000 (Visium v1), 0.999 (H
 : **Table S8.** Spatial concordance between the CPU reference (DGX node) and GPU pipelines, CPU repeat k against GPU repeat k (k = 1-5): a single value when it is the same in the five pairs, otherwise the range. SVG Jaccard reports the overlap of spatially variable genes ranked by Moran's I. Co-occurrence and neighbourhood enrichment were skipped on the HD 2 um subsample (more than 500 groups); at Visium HD 8 um the GPU co-occurrence is the incorrect result of rapids-singlecell 0.14.1 (see text). N clusters: groups returned by each pipeline's own Leiden run in each repeat. With the workstation CPU as reference, CPU Leiden returned 16, 7 and 2,559 groups and the ARI was 0.856, 0.972-0.975 and 0.084.
 
 | Metric | Visium v1 | HD 8 um | Visium HD 2 um (random 400k-bin subsample) |
-|:-------|----------:|------------:|------------:|
+|:-------------|----------:|-----------:|-----------:|
 | Moran's I Spearman rho | 1.0000 | 0.9999 | 1.0000 |
 | Geary's C Spearman rho | 1.0000 | 0.9995 | 0.9999 |
 | SVG Jaccard (top 50) | 1.000 | 1.000 | 1.000 |

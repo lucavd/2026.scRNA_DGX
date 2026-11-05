@@ -2,6 +2,10 @@
 
 ## 2026-11-05
 
+- [LaTeX, METEOR e verifica finale (S7)](steps/S7.md): sorgente LaTeX llncs 2.26 di capitolo e supplemento generato da `tools/s7_md2lncs.py` (capitolo 14 pagine, supplemento 24, 0 errori); controllo indipendente `tools/s7_check.py` (stessi numeri e citazioni fra `.md` e `.tex`, 4 errori inseriti su 4 trovati); ricevute di S3, valori di S4 e S5 ricalcolati senza discordanze e provenienza di ogni numero (`tools/s7_provenance.py`); bibliografia contro Crossref; pacchetto `manuscript/meteor/`; decisioni tecniche [Sorgente LaTeX generato da script, figure copiate con il loro numero (D-23)](decisions/D-23.md) e [Correzioni del repository prima della release (D-24)](decisions/D-24.md) (script di download spatial, SLURM a 8 GPU, README, `LEGENDS.md`); cancelli G1-G5 superati, P1-P4 confermate; report `reports/S7.html`. Step in attesa delle tre scelte del PI (DOI, ringraziamenti, PDF finale).
+
+- [LaTeX, METEOR e verifica finale (S7)](steps/S7.md) aperto: attese pre-registrate (5 cancelli, 4 previsioni); manifest dei grezzi all'apertura: 921 file, 0 differenze.
+
 - [taglio e stile (S6)](steps/S6.md) chiuso: il PI approva il testo del capitolo tagliato a 15 pagine e il supplemento (approvazione nel file dello step).
 
 ## 2026-11-04

@@ -10,7 +10,10 @@
 #SBATCH --mail-type=ALL
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
-#SBATCH --cpus-per-task=200
+#SBATCH --cpus-per-task=100
+# 100 CPUs, as in the 8-GPU benchmark runs of the chapter (jobs 16303-16317, 15 March 2026;
+# results_v2/S3/R2_dgx_evidence/sacct_u0044_2026-02-01_2026-11-04.txt). The value was raised to 200
+# on 20 March 2026 (commit 07031f4) and no gpu_bench_8 job ran with it; restored on 5 November 2026.
 #SBATCH --mem=1800G
 #SBATCH --gres=gpu:8
 #SBATCH --time=168:00:00

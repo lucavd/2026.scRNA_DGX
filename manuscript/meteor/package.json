@@ -1,0 +1,84 @@
+{
+ "files": {
+  "CHECKLIST_METEOR.md": "62ba1d951be47687bcea6da50c437892",
+  "alt_text_draft.md": "3f01243c506b7483d54940820967a256",
+  "disclosure_of_interests.txt": "f363d2022cb04fa07a4a3a659dd0ef8e",
+  "figures/fig1.pdf": "43c2e665d3a0addbc440588f822ff963",
+  "figures/fig2.pdf": "fde366b542fbec8703d05a1faa59f0b7",
+  "figures/fig3.pdf": "0ea87f0200b2e1166d0f440ecfe18911",
+  "figures/fig4.pdf": "cb87da4824c069dcf644344acb9b4d69",
+  "full_paper_LNBI.pdf": "bf8fff0558049e39218ac2310217f60d",
+  "full_paper_LNBI_source.zip": "e9e845d0f7db77785bbc741b2051c25e",
+  "zenodo/supplementary_LNBI.pdf": "ce22e9d7631beab52222defc7df87768"
+ },
+ "zip_contents": [
+  "aliascnt.sty",
+  "cibb2026_references.bib",
+  "figures/fig1.pdf",
+  "figures/fig2.pdf",
+  "figures/fig3.pdf",
+  "figures/fig4.pdf",
+  "full_paper_LNBI.bbl",
+  "full_paper_LNBI.tex",
+  "llncs.cls",
+  "splncs04.bst"
+ ],
+ "clean_build": {
+  "dir": "/tmp/lnbi_meteor_hihak5pq",
+  "commands": [
+   [
+    "pdflatex -interaction=nonstopmode full_paper_LNBI.tex",
+    0
+   ],
+   [
+    "bibtex full_paper_LNBI",
+    0
+   ],
+   [
+    "pdflatex -interaction=nonstopmode full_paper_LNBI.tex",
+    0
+   ],
+   [
+    "pdflatex -interaction=nonstopmode full_paper_LNBI.tex",
+    0
+   ]
+  ],
+  "pages": 14,
+  "latex_errors": 0,
+  "undefined_citations": [],
+  "undefined_references": [],
+  "bbl_identical": true,
+  "pass": true
+ },
+ "disclosure_tex_equals_md": true,
+ "disclosure": "The authors have no competing interests to declare that are relevant to the content of this article.",
+ "figures": [
+  {
+   "number": "1",
+   "file": "figures/fig1.pdf",
+   "source": "figures/fig1_speedup_heatmap.pdf",
+   "same_md5_as_source": true
+  },
+  {
+   "number": "2",
+   "file": "figures/fig2.pdf",
+   "source": "figures/fig3_concordance.pdf",
+   "same_md5_as_source": true
+  },
+  {
+   "number": "3",
+   "file": "figures/fig3.pdf",
+   "source": "figures/fig8_spatial_perstep.pdf",
+   "same_md5_as_source": true
+  },
+  {
+   "number": "4",
+   "file": "figures/fig4.pdf",
+   "source": "figures/fig9_spatial_concordance.pdf",
+   "same_md5_as_source": true
+  }
+ ],
+ "alt_text_numbers_not_in_chapter": [],
+ "chapter_pages": 14,
+ "supplement_pages": 24
+}

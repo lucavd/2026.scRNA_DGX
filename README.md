@@ -1,13 +1,14 @@
 # 2026.scRNA_DGX
 
-GPU-accelerated single-cell and spatial transcriptomics benchmark on NVIDIA DGX H100, comparing the CPU-based Scanpy stack against rapids-singlecell (GPU) for speed, biological concordance, and scale. Companion repository for the CIBB 2026 short paper.
+GPU-accelerated single-cell and spatial transcriptomics benchmark on NVIDIA DGX H100, comparing the CPU-based Scanpy stack against rapids-singlecell (GPU) for speed, biological concordance, and scale. Companion repository for the CIBB 2026 short paper and for its extended chapter in Springer LNBI (`manuscript/full_paper_LNBI.md`, LaTeX in `manuscript/lncs_latex/`, Supplementary Material in `manuscript/supplementary_LNBI.md`).
 
-Key findings (scRNA-seq, mouse brain 1.3M cells):
+Key findings, as reported in the LNBI chapter (every value is re-read from the result files by the scripts in `tools/`):
 
-- 120x end-to-end speedup on 1 to 8 H100 GPUs vs 100-core CPU (14.5 h to 7.3 min).
-- Biological concordance is high: HVG Jaccard = 1.000, PCA Spearman rho = 1.000, Leiden ARI 0.908 to 0.963.
-- CPU-side preprocessing, not GPU VRAM, is the binding constraint at extreme scale (maximum processable: 11.9M cells on a single DGX H100 node).
-- For spatial (Visium HD 8 um, 393k bins): 51.6x overall speedup, 3,272x speedup for co-occurrence analysis, near-perfect Moran/Geary concordance (rho >= 0.9995).
+- scRNA-seq, 1.3 million mouse brain cells: the GPU pipeline took 435.2 s against 52,056.2 s on 100 logical CPUs (119.6-fold with eight GPUs allocated, 105.5-fold with two). Wilcoxon DE accounted for 93.5% of the CPU time; without it the speedup was 7.9-9.2-fold. Additional GPUs did no computation in this configuration.
+- Concordance at 10,000 cells: HVG selection identical (Jaccard = 1.000), Leiden ARI 0.908-0.963.
+- A memory-optimised pipeline completed 11.9 million cells, built from copies of a 3,436,470-cell dataset.
+- Spatial, one RTX 4090 against 100 CPUs of a DGX H100 node: 1.4-fold on Visium v1, 6.9-fold on Visium HD 8 um (without co-occurrence) and 10.4-fold on a random 400k-bin subsample of Visium HD 2 um. GPU co-occurrence in rapids-singlecell 0.14.1 was wrong at 41 of 49 distances through 32-bit integer overflow; version 0.15.1 matched the CPU at all 49.
+- The spatial figures of the short paper (March 2026 runs) are superseded by the new CPU reference of the chapter (`SPATIAL/results_v2/`).
 
 ## Repository structure
 

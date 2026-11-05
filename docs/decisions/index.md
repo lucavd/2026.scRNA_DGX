@@ -31,3 +31,8 @@
 # Decisioni tecniche (4 novembre 2026)
 
 * [Citazioni di librerie e scheda DGX non aggiunte dopo il taglio (D-22)](D-22.md) - Le voci R0554 e R0549 rinviate da S3 si chiudono senza aggiungere citazioni.
+
+# Decisioni tecniche (5 novembre 2026)
+
+* [Sorgente LaTeX generato da script, figure copiate con il loro numero (D-23)](D-23.md) - Il .tex del capitolo e del supplemento si genera dal .md con tools/s7_md2lncs.py; le figure entrano come copie figN.pdf, mentre i file prodotti dagli script restano con il loro nome.
+* [Correzioni del repository prima della release (D-24)](D-24.md) - Script di download spatial, script SLURM a 8 GPU, risultati principali del README, LEGENDS.md e vecchie copie delle figure del LaTeX allineati a ciò che è girato e al capitolo.
