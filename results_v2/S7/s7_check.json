@@ -2,9 +2,9 @@
  "G3": {
   "chapter": {
    "md": "manuscript/full_paper_LNBI.md",
-   "md_md5": "6e8437eceac8c5ade5a4569766c78398",
+   "md_md5": "45c4023b90ad9bd1f7cd0f91874ddf14",
    "tex": "manuscript/lncs_latex/full_paper_LNBI.tex",
-   "tex_md5": "b69f2cb0fddb40487d93d760d776cf02",
+   "tex_md5": "e680809f6fa81d6df08eac2425fd2519",
    "n_numbers_md": 562,
    "n_numbers_tex": 562,
    "number_diffs": [],

@@ -13,6 +13,7 @@ Converts manuscript/full_paper_LNBI.md (chapter) or manuscript/supplementary_LNB
   - "**Figure N.**" / "**Table N.**" removed from the start of captions (llncs
     prints "Fig. N." / "Table N." itself) and replaced by \\label{fig:N} / \\label{tab:N};
   - ORCID identifiers from the YAML field `orcid:` of the .md, as \\orcidID after the author;
+  - the corresponding author (YAML field `corresponding:`) marked with (\\Envelope), package bbding;
   - figure files copied to <out>/figures/ under the number of their caption
     (fig1.pdf ... or figS1.pdf ...), md5 recorded (ledger R0735, decision D-23);
   - tables set in \\footnotesize with 2 pt column separation, \\emergencystretch 1em; long e-mail
@@ -136,12 +137,15 @@ def build(src, out, build_dir, supplement, doi, tag):
     btex = tables(symbols(breakable(btex)))
     orcid = dict(re.findall(r"(?m)^  ([^:\n]+):\s*(\d{4}-\d{4}-\d{4}-\d{3}[\dX])\s*$",
                             (re.search(r"(?ms)^orcid:\s*\n((?:  .*\n)+)", md.split("\n---\n", 1)[0] + "\n") or re.match("", "")).group(1) or ""))
+    cm = re.search(r"(?m)^corresponding:\s*(.+?)\s*$", md.split("\n---\n", 1)[0])
+    corresponding = cm.group(1) if cm else None
     alist = [a.strip() for a in re.split(r",\s+(?:and\s+)?(?=[A-Z])|\s+and\s+(?=[A-Z])", authors) if a.strip()]
     atex = []
     for a in alist:
         nm = re.sub(r"\^([0-9,]+)\^", "", a).strip()
         sup = re.search(r"\^([0-9,]+)\^", a)
-        atex.append(nm + (r"\inst{%s}" % sup.group(1) if sup else "") + (r"\orcidID{%s}" % orcid[nm] if nm in orcid else ""))
+        atex.append(nm + (r"\inst{%s}" % sup.group(1) if sup else "") + (r"(\Envelope)" if nm == corresponding else "")
+                    + (r"\orcidID{%s}" % orcid[nm] if nm in orcid else ""))
     itex = []
     for p in insts:
         t = re.sub(r"^\^[0-9]+\^\s*", "", p)
@@ -159,7 +163,7 @@ def build(src, out, build_dir, supplement, doi, tag):
     doc = ("\\documentclass[runningheads]{llncs}\n"
            "\\usepackage[T1]{fontenc}\n\\usepackage[utf8]{inputenc}\n\\usepackage{lmodern}\n"
            "\\usepackage{graphicx,booktabs,longtable,array,calc,amsmath,amssymb}\n"
-           "\\usepackage[hidelinks]{hyperref}\n"
+           "\\usepackage[hidelinks]{hyperref}\n" + ("\\usepackage{bbding}  %% \\Envelope, corresponding author\n" if corresponding else "") +
            "\\providecommand{\\tightlist}{\\setlength{\\itemsep}{0pt}\\setlength{\\parskip}{0pt}}\n"
            "\\def\\LTcaptype{table}\n\\makeatletter\\setlength{\\LTcapwidth}{\\textwidth}\n"
            "\\def\\LT@makecaption#1#2#3{\\LT@mcol\\LT@cols c{\\hbox to\\z@{\\hss\\parbox[t]\\LTcapwidth{\\small\\textbf{#2.} #3\\par\\vskip0.4\\baselineskip}\\hss}}}\n\\makeatother\n\\setlength{\\emergencystretch}{1em}\n" + supnum +

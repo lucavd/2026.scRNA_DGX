@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) (preloaded format=pdflatex 2025.4.29)  5 NOV 2026 17:29
+This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025) (preloaded format=pdflatex 2025.4.29)  5 NOV 2026 20:02
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -449,8 +449,10 @@ Package: uniquecounter 2019/12/15 v1.4 Provide unlimited unique counter (HO)
 Package uniquecounter Info: New unique counter `rerunfilecheck' on input line 285.
 )
 \Hy@SectionHShift=\skip65
+) (/home/user/.TinyTeX/texmf-dist/tex/latex/bbding/bbding.sty
+Package: bbding 1999/04/15 v1.01 Dingbats symbols
 )
-LaTeX Font Info:    Trying to load font information for T1+lmr on input line 13.
+LaTeX Font Info:    Trying to load font information for T1+lmr on input line 14.
  (/home/user/.TinyTeX/texmf-dist/tex/latex/lm/t1lmr.fd
 File: t1lmr.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 ) (/home/user/.TinyTeX/texmf-dist/tex/latex/l3backend/l3backend-pdftex.def
@@ -459,74 +461,78 @@ File: l3backend-pdftex.def 2025-03-14 L3 backend support: PDF output (pdfTeX)
 ) (./full_paper_LNBI.aux)
 \openout1 = `full_paper_LNBI.aux'.
 
-LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 13.
-LaTeX Font Info:    ... okay on input line 13.
-LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 13.
-LaTeX Font Info:    ... okay on input line 13.
-LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 13.
-LaTeX Font Info:    ... okay on input line 13.
-LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 13.
-LaTeX Font Info:    ... okay on input line 13.
-LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 13.
-LaTeX Font Info:    ... okay on input line 13.
-LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 13.
-LaTeX Font Info:    ... okay on input line 13.
-LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 13.
-LaTeX Font Info:    ... okay on input line 13.
-LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 13.
-LaTeX Font Info:    ... okay on input line 13.
-LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 13.
-LaTeX Font Info:    ... okay on input line 13.
+LaTeX Font Info:    Checking defaults for OML/cmm/m/it on input line 14.
+LaTeX Font Info:    ... okay on input line 14.
+LaTeX Font Info:    Checking defaults for OMS/cmsy/m/n on input line 14.
+LaTeX Font Info:    ... okay on input line 14.
+LaTeX Font Info:    Checking defaults for OT1/cmr/m/n on input line 14.
+LaTeX Font Info:    ... okay on input line 14.
+LaTeX Font Info:    Checking defaults for T1/cmr/m/n on input line 14.
+LaTeX Font Info:    ... okay on input line 14.
+LaTeX Font Info:    Checking defaults for TS1/cmr/m/n on input line 14.
+LaTeX Font Info:    ... okay on input line 14.
+LaTeX Font Info:    Checking defaults for OMX/cmex/m/n on input line 14.
+LaTeX Font Info:    ... okay on input line 14.
+LaTeX Font Info:    Checking defaults for U/cmr/m/n on input line 14.
+LaTeX Font Info:    ... okay on input line 14.
+LaTeX Font Info:    Checking defaults for PD1/pdf/m/n on input line 14.
+LaTeX Font Info:    ... okay on input line 14.
+LaTeX Font Info:    Checking defaults for PU/pdf/m/n on input line 14.
+LaTeX Font Info:    ... okay on input line 14.
  (/home/user/.TinyTeX/texmf-dist/tex/latex/epstopdf-pkg/epstopdf-base.sty
 Package: epstopdf-base 2020-01-24 v2.11 Base part for package epstopdf
 Package epstopdf-base Info: Redefining graphics rule for `.eps' on input line 485.
  (/home/user/.TinyTeX/texmf-dist/tex/latex/latexconfig/epstopdf-sys.cfg
 File: epstopdf-sys.cfg 2010/07/13 v1.3 Configuration of (r)epstopdf for TeX Live
 ))
-Package hyperref Info: Link coloring OFF on input line 13.
+Package hyperref Info: Link coloring OFF on input line 14.
  (./full_paper_LNBI.out) (./full_paper_LNBI.out)
 \@outlinefile=\write3
 \openout3 = `full_paper_LNBI.out'.
 
-LaTeX Font Info:    Trying to load font information for OT1+lmr on input line 22.
+LaTeX Font Info:    Trying to load font information for OT1+lmr on input line 23.
  (/home/user/.TinyTeX/texmf-dist/tex/latex/lm/ot1lmr.fd
 File: ot1lmr.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 )
-LaTeX Font Info:    Trying to load font information for OML+lmm on input line 22.
+LaTeX Font Info:    Trying to load font information for OML+lmm on input line 23.
  (/home/user/.TinyTeX/texmf-dist/tex/latex/lm/omllmm.fd
 File: omllmm.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 )
-LaTeX Font Info:    Trying to load font information for OMS+lmsy on input line 22.
+LaTeX Font Info:    Trying to load font information for OMS+lmsy on input line 23.
  (/home/user/.TinyTeX/texmf-dist/tex/latex/lm/omslmsy.fd
 File: omslmsy.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 )
-LaTeX Font Info:    Trying to load font information for OMX+lmex on input line 22.
+LaTeX Font Info:    Trying to load font information for OMX+lmex on input line 23.
  (/home/user/.TinyTeX/texmf-dist/tex/latex/lm/omxlmex.fd
 File: omxlmex.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 )
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <10> on input line 22.
+(Font)              <10> on input line 23.
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <7> on input line 22.
+(Font)              <7> on input line 23.
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <5> on input line 22.
-LaTeX Font Info:    Trying to load font information for U+msa on input line 22.
+(Font)              <5> on input line 23.
+LaTeX Font Info:    Trying to load font information for U+msa on input line 23.
  (/home/user/.TinyTeX/texmf-dist/tex/latex/amsfonts/umsa.fd
 File: umsa.fd 2013/01/14 v3.01 AMS symbols A
 )
-LaTeX Font Info:    Trying to load font information for U+msb on input line 22.
+LaTeX Font Info:    Trying to load font information for U+msb on input line 23.
  (/home/user/.TinyTeX/texmf-dist/tex/latex/amsfonts/umsb.fd
 File: umsb.fd 2013/01/14 v3.01 AMS symbols B
 )
-LaTeX Font Info:    Trying to load font information for T1+lmtt on input line 22.
+LaTeX Font Info:    Trying to load font information for U+ding on input line 23.
+ (/home/user/.TinyTeX/texmf-dist/tex/latex/bbding/Uding.fd
+File: Uding.fd 1996/02/01 v1.0 BBding font definitions
+)
+LaTeX Font Info:    Trying to load font information for T1+lmtt on input line 23.
  (/home/user/.TinyTeX/texmf-dist/tex/latex/lm/t1lmtt.fd
 File: t1lmtt.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 )
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <9> on input line 22.
+(Font)              <9> on input line 23.
 LaTeX Font Info:    External font `lmex10' loaded for size
-(Font)              <6> on input line 22.
-LaTeX Font Info:    Trying to load font information for TS1+lmr on input line 23.
+(Font)              <6> on input line 23.
+LaTeX Font Info:    Trying to load font information for TS1+lmr on input line 24.
  (/home/user/.TinyTeX/texmf-dist/tex/latex/lm/ts1lmr.fd
 File: ts1lmr.fd 2015/05/01 v1.6.1 Font defs for Latin Modern
 )
@@ -541,48 +547,48 @@ Underfull \vbox (badness 2126) has occurred while \output is active []
 [2]
 
 [3{/home/user/.TinyTeX/texmf-dist/fonts/enc/dvips/lm/lm-mathsy.enc}]
-Underfull \hbox (badness 1342) in paragraph at lines 111--124
+Underfull \hbox (badness 1342) in paragraph at lines 112--125
 \T1/lmtt/m/n/10 nvcr . io / nvidia / rapidsai / base : 26 . 02-[]cuda12-[]py3 . 12$\T1/lmr/m/n/10 . The 8-GPU runs,
  []
 
 
-Overfull \hbox (0.34703pt too wide) in paragraph at lines 131--142
+Overfull \hbox (0.34703pt too wide) in paragraph at lines 132--143
 \T1/lmr/m/n/10 At 1.3 mil-lion cells the GPU pipeline with eight GPUs al-lo-cated took 435.2 $\OMS/lmsy/m/n/10 ^^F$ \T1/lmr/m/n/10 16.2
  []
 
 
 
 [4]
-<figures/fig1.pdf, id=150, 239.00314pt x 227.62204pt>
+<figures/fig1.pdf, id=151, 239.00314pt x 227.62204pt>
 File: figures/fig1.pdf Graphic file (type pdf)
 <use figures/fig1.pdf>
-Package pdftex.def Info: figures/fig1.pdf  used on input line 231.
+Package pdftex.def Info: figures/fig1.pdf  used on input line 232.
 (pdftex.def)             Requested size: 239.00255pt x 227.62148pt.
 
 
 [5]
 
 [6 <./figures/fig1.pdf>]
-<figures/fig2.pdf, id=170, 347.12363pt x 147.95433pt>
+<figures/fig2.pdf, id=171, 347.12363pt x 147.95433pt>
 File: figures/fig2.pdf Graphic file (type pdf)
 <use figures/fig2.pdf>
-Package pdftex.def Info: figures/fig2.pdf  used on input line 248.
+Package pdftex.def Info: figures/fig2.pdf  used on input line 249.
 (pdftex.def)             Requested size: 347.12277pt x 147.95396pt.
 
 
 [7 <./figures/fig2.pdf>]
-<figures/fig3.pdf, id=191, 347.12363pt x 193.47874pt>
+<figures/fig3.pdf, id=192, 347.12363pt x 193.47874pt>
 File: figures/fig3.pdf Graphic file (type pdf)
 <use figures/fig3.pdf>
-Package pdftex.def Info: figures/fig3.pdf  used on input line 354.
+Package pdftex.def Info: figures/fig3.pdf  used on input line 355.
 (pdftex.def)             Requested size: 347.12277pt x 193.47826pt.
 
 
 [8]
-<figures/fig4.pdf, id=202, 347.12363pt x 165.02599pt>
+<figures/fig4.pdf, id=203, 347.12363pt x 165.02599pt>
 File: figures/fig4.pdf Graphic file (type pdf)
 <use figures/fig4.pdf>
-Package pdftex.def Info: figures/fig4.pdf  used on input line 367.
+Package pdftex.def Info: figures/fig4.pdf  used on input line 368.
 (pdftex.def)             Requested size: 347.12277pt x 165.02557pt.
 
 
@@ -609,18 +615,18 @@ Package rerunfilecheck Info: File `full_paper_LNBI.out' has not changed.
 (rerunfilecheck)             Checksum: DF67CBB0374F4ACC0E66BDE7A218202F;894.
  ) 
 Here is how much of TeX's memory you used:
- 10776 strings out of 471607
- 162940 string characters out of 5521273
- 580665 words of memory out of 5000000
- 37083 multiletter control sequences out of 15000+600000
- 676574 words of font info for 81 fonts, out of 8000000 for 9000
+ 10935 strings out of 471607
+ 165457 string characters out of 5521273
+ 580912 words of memory out of 5000000
+ 37234 multiletter control sequences out of 15000+600000
+ 676719 words of font info for 82 fonts, out of 8000000 for 9000
  14 hyphenation exceptions out of 8191
  75i,9n,79p,1707b,603s stack positions out of 10000i,1000n,20000p,200000b,200000s
-</home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmbx10.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmbx12.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmbx9.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmmi10.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmmi7.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmmi9.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmr10.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmr6.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmr7.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmr9.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmsy10.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmsy7.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmsy9.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmtt10.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmtt9.pfb>
-Output written on full_paper_LNBI.pdf (14 pages, 405634 bytes).
+ </home/user/.TinyTeX/texmf-var/fonts/pk/ljfour/public/bbding/bbding10.600pk></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmbx10.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmbx12.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmbx9.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmmi10.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmmi7.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmmi9.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmr10.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmr6.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmr7.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmr9.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmsy10.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmsy7.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmsy9.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmtt10.pfb></home/user/.TinyTeX/texmf-dist/fonts/type1/public/lm/lmtt9.pfb>
+Output written on full_paper_LNBI.pdf (14 pages, 406141 bytes).
 PDF statistics:
- 473 PDF objects out of 1000 (max. 8388607)
- 352 compressed objects within 4 object streams
+ 478 PDF objects out of 1000 (max. 8388607)
+ 356 compressed objects within 4 object streams
  79 named destinations out of 1000 (max. 500000)
  29 words of extra memory for PDF output out of 10000 (max. 10000000)
 
