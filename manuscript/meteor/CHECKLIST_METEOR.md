@@ -29,5 +29,5 @@ Stato: **fatto** = pronto nel repository; **PI** = azione del PI, che fa la sott
 | Acknowledgements e Disclosure of Interests nell'ambiente `credits` | fatto | Funding come secondo paragrafo dei ringraziamenti |
 | Ringraziamento CONVECS per i run su UPSCALE | PI | formula da `https://convecs.it/projects-and-ack/` letta il 4 novembre 2026; da confermare con `hpc@unipd.it` |
 | Strumento di LLM nominato nei ringraziamenti | PI, facoltativo | oggi la frase non lo nomina |
-| Release del repository con DOI Zenodo, citata in Availability | PI | supplemento pronto per la release: `manuscript/meteor/zenodo/supplementary_LNBI.pdf` (24 pagine); dopo la release il DOI entra nel testo e il LaTeX si rigenera con `python3 -B tools/s7_md2lncs.py` |
+| Release del repository con DOI Zenodo, citata in Availability | fatto, pubblicazione PI | `https://github.com/lucavd/scRNA-DGX-benchmark` (tag `v1.0.0`), DOI riservato `10.5281/zenodo.23984290`, già scritto nel capitolo e nel supplemento; l'archivio è caricato nella bozza Zenodo 23984290 e va pubblicato prima della sottomissione (non si annulla) |
 | Supplemento non caricato su SpringerLink | fatto | scelta del PI (decisione D-21): solo nella release Zenodo |
