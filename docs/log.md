@@ -2,6 +2,8 @@
 
 ## 2026-11-05
 
+- [LaTeX, METEOR e verifica finale (S7)](steps/S7.md) chiuso: il PI approva pubblicazione dell'archivio, ringraziamenti e PDF finale; deposito Zenodo pubblicato con DOI 10.5281/zenodo.23984290 (approvazione nel file dello step).
+
 - [LaTeX, METEOR e verifica finale (S7)](steps/S7.md), seguito: scelte del PI in [ORCID, strumento di LLM nei ringraziamenti e supplemento anche su METEOR (D-26)](decisions/D-26.md); ORCID di Luca Vedovelli nell'intestazione, «Claude Opus 5.5, Anthropic» nei ringraziamenti (`tools/s7_ack_orcid.py`); LaTeX, controlli e pacchetto rifatti (14 e 24 pagine); release e archivio Zenodo aggiornati.
 
 - [LaTeX, METEOR e verifica finale (S7)](steps/S7.md), seguito: scelte del PI in [Repository pubblica pulita scRNA-DGX-benchmark con DOI Zenodo (D-25)](decisions/D-25.md); DOI riservato 10.5281/zenodo.23984290 scritto nel capitolo e nel supplemento, LaTeX e pacchetto rigenerati e ricontrollati; tolti i 6 PDF degli articoli citati; release pulita `lucavd/scRNA-DGX-benchmark` v1.0.0 (1.155 file, un commit) costruita da `tools/s7_release_tree.py`; archivio caricato nella bozza Zenodo, pubblicazione in attesa dell'ok del PI.

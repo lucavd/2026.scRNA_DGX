@@ -1,6 +1,6 @@
 {
  "files": {
-  "CHECKLIST_METEOR.md": "6cc9e529b4ddd6f378cfaaf949bb084f",
+  "CHECKLIST_METEOR.md": "34d36f4cf1b23253502b92e13897b075",
   "alt_text_draft.md": "3f01243c506b7483d54940820967a256",
   "disclosure_of_interests.txt": "f363d2022cb04fa07a4a3a659dd0ef8e",
   "figures/fig1.pdf": "43c2e665d3a0addbc440588f822ff963",
@@ -24,7 +24,7 @@
   "splncs04.bst"
  ],
  "clean_build": {
-  "dir": "/tmp/lnbi_meteor_tml6hf1d",
+  "dir": "/tmp/lnbi_meteor_8uuzfgi1",
   "commands": [
    [
     "pdflatex -interaction=nonstopmode full_paper_LNBI.tex",

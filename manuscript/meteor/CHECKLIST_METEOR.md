@@ -27,7 +27,7 @@ Stato: **fatto** = pronto nel repository; **PI** = azione del PI, che fa la sott
 | Almeno un aspetto esteso rispetto allo short paper | fatto | nuovo riferimento CPU spatial (step S1) |
 | Almeno 8 pagine, formato LNCS | fatto | 14 pagine, riferimenti da pagina 12 |
 | Acknowledgements e Disclosure of Interests nell'ambiente `credits` | fatto | Funding come secondo paragrafo dei ringraziamenti |
-| Ringraziamento CONVECS per i run su UPSCALE | PI | formula da `https://convecs.it/projects-and-ack/` letta il 4 novembre 2026; da confermare con `hpc@unipd.it` |
+| Ringraziamento CONVECS per i run su UPSCALE | fatto | formula da `https://convecs.it/projects-and-ack/` letta il 4 novembre 2026, confermata dal PI il 5 novembre 2026 |
 | Strumento di LLM nominato nei ringraziamenti | fatto | «Claude Opus 5.5, Anthropic» |
-| Release del repository con DOI Zenodo, citata in Availability | fatto, pubblicazione PI | `https://github.com/lucavd/scRNA-DGX-benchmark` (tag `v1.0.0`), DOI riservato `10.5281/zenodo.23984290`, già scritto nel capitolo e nel supplemento; l'archivio è caricato nella bozza Zenodo 23984290 e va pubblicato prima della sottomissione (non si annulla) |
+| Release del repository con DOI Zenodo, citata in Availability | fatto | `https://github.com/lucavd/scRNA-DGX-benchmark` (tag `v1.0.0`), DOI riservato `10.5281/zenodo.23984290`, già scritto nel capitolo e nel supplemento; archivio pubblicato su Zenodo il 5 novembre 2026 (`https://zenodo.org/record/23984290`) |
 | Supplemento come materiale supplementare su METEOR | PI | caricare `manuscript/meteor/zenodo/supplementary_LNBI.pdf` (24 pagine), lo stesso file dell'archivio Zenodo; Springer chiede l'approvazione preventiva dei PC Chairs per il materiale supplementare (scelta del PI del 5 novembre 2026) |
