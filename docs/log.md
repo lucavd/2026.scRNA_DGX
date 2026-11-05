@@ -1,5 +1,9 @@
 # Registro
 
+## 2026-11-05
+
+- [taglio e stile (S6)](steps/S6.md) chiuso: il PI approva il testo del capitolo tagliato a 15 pagine e il supplemento (approvazione nel file dello step).
+
 ## 2026-11-04
 
 - [taglio e stile (S6)](steps/S6.md): capitolo da 38 a 15 pagine LNCS (testo principale con 2 tabelle e 4 figure, circa 3.100 parole di prosa) e supplemento `manuscript/supplementary_LNBI.md` (26 pagine, Tables S1-S8, Figures S1-S3) secondo [Taglio a 15 pagine LNCS con un documento supplementare su Zenodo (D-21)](decisions/D-21.md); 9 voci di stile del piano nel diario; decisione tecnica [Citazioni di librerie e scheda DGX non aggiunte dopo il taglio (D-22)](decisions/D-22.md); controllo indipendente `tools/s6_check.py` (0 numeri nuovi, 0 righe di tabella e 0 citazioni perse); cancelli G1-G5 superati, P1 e P2 confermate, P3 e P4 smentite e spiegate; report `reports/S6.html`. Step in attesa della lettura del PI.
